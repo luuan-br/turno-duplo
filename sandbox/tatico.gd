@@ -32,8 +32,7 @@ const FIRE_RANGE := 900.0  ## bem maior que a sala — na prática "até bater e
 const COVER_DISTANCE := 30.0
 const DOOR_INTERACT_DIST := 60.0
 
-const FACING_TURN_SPEED_AIMING := 6.0   ## rad/s enquanto o manche direito está sendo arrastado — era 14, depois 9, usuário pediu ainda mais suave
-const FACING_TURN_SPEED_IDLE := 2.5     ## rad/s voltando sozinho pra direção de movimento
+const FACING_TURN_SPEED_AIMING := 9.0   ## rad/s enquanto o manche direito está sendo arrastado — voltou de 6 pra 9 depois que manche/movimento foram desacoplados
 
 var player: CharacterBody2D
 var door1_body: StaticBody2D  ## trancada — precisa arrombar
@@ -238,6 +237,7 @@ func _build_controls() -> void:
 	# mesma área.
 	breach_btn = _corner_button("breach", "ARROMBAR", 130, 30, 110, 110)
 	breach_btn.visible = false
+	breach_btn.show_hold_progress = true
 	layer.add_child(breach_btn)
 
 	open_btn = _corner_button("open_door", "ABRIR", 130, 30, 110, 110)
@@ -295,22 +295,17 @@ func _move_player(delta: float) -> void:
 
 
 func _update_facing(delta: float) -> void:
-	# Manche direito tocado = mira responde rápido. Sem tocar nele, o
-	# personagem olha pra onde anda, girando DEVAGAR até lá (não é mais
-	# um corte instantâneo — validado pelo usuário como o comportamento
-	# certo: "atirar parado" vira uma vantagem real de precisão).
-	var target_dir := _facing
-	var turn_speed := FACING_TURN_SPEED_IDLE
-
+	# Manches totalmente desacoplados: esquerdo só move, direito é o
+	# único jeito de mudar pra onde o personagem olha. Antes, sem tocar
+	# o manche direito, a mira "seguia" a direção de movimento — parecia
+	# uma boa ideia isolada, mas em gameplay de verdade (Fase 2) isso
+	# deixava tudo travado (girar sem querer só de andar). Agora, sem
+	# tocar o manche direito, a mira simplesmente congela onde estava.
 	if InputBridge.aim_touching and InputBridge.aim_vector.length() > 0.15:
-		target_dir = InputBridge.aim_vector.normalized()
-		turn_speed = FACING_TURN_SPEED_AIMING
-	elif InputBridge.move_vector.length() > 0.15:
-		target_dir = InputBridge.move_vector.normalized()
-
-	var diff := wrapf(target_dir.angle() - _facing.angle(), -PI, PI)
-	var max_step := turn_speed * delta
-	_facing = _facing.rotated(clamp(diff, -max_step, max_step))
+		var target_dir := InputBridge.aim_vector.normalized()
+		var diff := wrapf(target_dir.angle() - _facing.angle(), -PI, PI)
+		var max_step := FACING_TURN_SPEED_AIMING * delta
+		_facing = _facing.rotated(clamp(diff, -max_step, max_step))
 
 
 func _nearest_wall_distance() -> float:
@@ -334,7 +329,7 @@ func _update_doors() -> void:
 	var near1 := player.position.distance_to(door1_body.position) < DOOR_INTERACT_DIST
 	breach_btn.visible = near1 and not door1_open
 	if breach_btn.visible and InputBridge.consume_just_released("breach"):
-		var hold := InputBridge.hold_time("breach")
+		var hold := InputBridge.last_hold_time("breach")
 		door1_open = true
 		status_label.text = ("Porta TRANCADA arrombada DEVAGAR (silencioso) — %.2fs" % hold) if hold > 0.5 else ("Porta TRANCADA arrombada RÁPIDO (barulhento) — %.2fs" % hold)
 
@@ -345,13 +340,22 @@ func _update_doors() -> void:
 		status_label.text = "Porta DESTRANCADA aberta normalmente — sem precisar arrombar."
 
 
+func _fire_exclude() -> Array[RID]:
+	# Alvo já abatido não deveria continuar bloqueando o raio — sem isso,
+	# a mira "parava" nele pra sempre mesmo depois de neutralizado.
+	var ex: Array[RID] = [player.get_rid()]
+	if target_hit:
+		ex.append(target.get_rid())
+	return ex
+
+
 func _update_aim_preview() -> void:
 	var space_state := get_world_2d().direct_space_state
 	var start := player.position + _facing * (PLAYER_RADIUS + 2.0)
 	var query := PhysicsRayQueryParameters2D.create(start, start + _facing * FIRE_RANGE)
 	query.collide_with_areas = true
 	query.collide_with_bodies = true
-	query.exclude = [player.get_rid()]
+	query.exclude = _fire_exclude()
 	var result := space_state.intersect_ray(query)
 
 	if result.is_empty():
@@ -374,7 +378,7 @@ func _update_fire() -> void:
 	var query := PhysicsRayQueryParameters2D.create(start, start + _facing * FIRE_RANGE)
 	query.collide_with_areas = true
 	query.collide_with_bodies = true
-	query.exclude = [player.get_rid()]
+	query.exclude = _fire_exclude()
 	var result := space_state.intersect_ray(query)
 
 	if result.is_empty():
@@ -407,7 +411,7 @@ func _update_hud() -> void:
 		state = "espiando"
 	elif _in_cover:
 		state = "em cobertura"
-	status_label.text = "Estado: %s\nEsquerda move. Direita mira (segura pra apontar; solta e a mira volta devagar pra direção de movimento).\nATIRAR sempre disponível — acerta o que estiver na mira: parede, alvo, luminária, caixa.\nPorta de cima é destrancada (ABRIR); porta da direita é trancada (ARROMBAR)." % state
+	status_label.text = "Estado: %s\nEsquerda SÓ move. Direita SÓ mira (segure pra apontar; solte e a mira congela onde estava, não segue mais o movimento).\nATIRAR sempre disponível — acerta o que estiver na mira: parede, alvo, luminária, caixa.\nPorta de cima é destrancada (ABRIR); porta da direita é trancada — segure ARROMBAR até o anel ficar AZUL pra entrar em silêncio; solte antes disso pra entrar com força." % state
 
 
 func _draw() -> void:

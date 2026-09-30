@@ -4,7 +4,20 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 
 ## [Não lançado]
 
+### Corrigido
+- **PIT maneuver sem sentido nenhum**: bastava chegar perto por trás e segurar o botão parado por um tempo — sem contato nenhum entre os carros. Agora precisa alinhar + segurar o botão + **bater de verdade** no carro-alvo (detectado via colisão real do `CharacterBody2D`, não só proximidade).
+
 ### Adicionado
+- **Ato 1, Fase 3 — Direção Defensiva** (`missions/ato1_fase3_direcao.gd`): circuito fechado sem risco — 3 checkpoints em sequência, depois um PIT maneuver de prática num carro-alvo. Contraste narrativo: o Theo (que provocava o Mark por ser cuidadoso demais nas Fases 1/2) quase bate de tanta pressa, e é a primeira vez que a Okafor valoriza a direção controlada do Mark sem ressalva. Reaproveita a física de direção/freio/PIT do sandbox de perseguição.
+- `FACING_TURN_SPEED_AIMING` voltou de 6 pra 9 rad/s (tático, Fase 1, Fase 2) — mais responsivo agora que manche e movimento estão desacoplados.
+
+### Corrigido
+- **Bug real em `hold_time()`** (`autoload/input_bridge.gd`): quem lia a duração do toque *depois* de `consume_just_released()` sempre via 0.0 (a função se recusa a responder pra uma ação que já não está mais "segurada"), então a porta sempre registrava como arrombada RÁPIDO, não importa quanto tempo o jogador segurasse de verdade. Corrigido com `last_hold_time()`, que captura a duração no instante do soltar, antes do estado ser limpo.
+- **Mira parava em alvo já abatido** em vez de passar pra o que estivesse atrás — o raio de mira/tiro agora exclui do cálculo qualquer alvo/ameaça/civil já marcado como atingido (tático, Fase 1 e Fase 2).
+- **Manches desacoplados de vez:** antes, sem tocar o manche direito, a mira "seguia" devagar a direção de movimento — parecia uma ideia boa isolada, mas em gameplay de verdade (Fase 2, com mais alvos e obstáculo) deixava tudo travado. Agora esquerdo só move, direito é o único jeito de mudar a mira; sem tocar nele, a mira fica congelada onde estava.
+
+### Adicionado
+- **Anel de progresso ao segurar** botões contextuais (`ui/contextual_button.gd`, `show_hold_progress`): pra ações onde toque-rápido-vs-segurar muda o resultado (arrombar), um anel preenche enquanto o dedo fica no botão e muda de laranja pra azul ao passar do limiar — antes só um texto dizia "segurar = devagar", sem nenhum feedback em tempo real, o que deixava confuso saber se estava "fazendo certo" antes de soltar. Ligado no botão ARROMBAR do sandbox tático e da Ato 1 Fase 2.
 - **Ato 1, Fase 2 — Abordagem Tática** (`missions/ato1_fase2_abordagem.gd`): casa de treinamento com alvos-ameaça e alvos-não-ameaça (civil/refém) misturados — o jogador precisa discriminar antes de atirar, não só acertar. Okafor e Theo ficam observando de fora (não entram com o Mark) e avaliam a atuação: reação muda se acertou algum civil, e tem uma nota sobre o estilo de arrombamento (rápido/barulhento vs. devagar/limpo). Reaproveita manche, câmera, cobertura/espiar, arrombar e a linha de mira já validados.
 - Ato 1 Fase 1 ganhou uma terceira área: **Rua/Estacionamento**, fora da academia, onde o Mark chega antes de entrar. Okafor e Theo agora esperam **parados** na entrada e só reagem (falam) quando o jogador chega perto (zona de proximidade), em vez de a conversa disparar sozinha ao carregar a fase.
 - **Mecânica de pegar arma**: bancada no estande com botão contextual "PEGAR" — o botão ATIRAR só aparece depois de pegar a arma. Base do sistema futuro de pegar a arma de um suspeito quando a do jogador ficar sem munição (registrado como pendência de design no GDD).

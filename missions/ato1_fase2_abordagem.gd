@@ -32,8 +32,7 @@ const FIRE_RANGE := 900.0
 const COVER_DISTANCE := 30.0
 const DOOR_INTERACT_DIST := 60.0
 
-const FACING_TURN_SPEED_AIMING := 6.0
-const FACING_TURN_SPEED_IDLE := 2.5
+const FACING_TURN_SPEED_AIMING := 9.0   ## voltou de 6 pra 9 depois que manche/movimento foram desacoplados
 
 var _staging_origin: Vector2
 var _house_origin: Vector2
@@ -279,6 +278,7 @@ func _build_controls() -> void:
 
 	breach_btn = _action_button("breach", tr("ARROMBAR"), 30.0, 180.0, 100.0, 100.0)
 	breach_btn.visible = false
+	breach_btn.show_hold_progress = true
 	layer.add_child(breach_btn)
 
 	fire_btn = _action_button("shoot", tr("ATIRAR"), 30.0, 180.0, 100.0, 100.0)
@@ -358,7 +358,7 @@ func _update_door() -> void:
 	if not breach_btn.visible:
 		return
 	if InputBridge.consume_just_released("breach"):
-		var hold := InputBridge.hold_time("breach")
+		var hold := InputBridge.last_hold_time("breach")
 		door_open = true
 		_breached_loud = hold <= 0.5
 		_phase = "clearing"
@@ -428,17 +428,15 @@ func _move_player(delta: float) -> void:
 
 
 func _update_facing(delta: float) -> void:
-	var target_dir := _facing
-	var turn_speed := FACING_TURN_SPEED_IDLE
+	# Manches desacoplados: esquerdo só move, direito é o único jeito de
+	# mudar a mira. Sem tocar o manche direito, a mira congela onde
+	# estava (não segue mais a direção de movimento — isso deixava a
+	# gameplay travada numa sala com mais alvos e obstáculo, como aqui).
 	if InputBridge.aim_touching and InputBridge.aim_vector.length() > 0.15:
-		target_dir = InputBridge.aim_vector.normalized()
-		turn_speed = FACING_TURN_SPEED_AIMING
-	elif InputBridge.move_vector.length() > 0.15:
-		target_dir = InputBridge.move_vector.normalized()
-
-	var diff := wrapf(target_dir.angle() - _facing.angle(), -PI, PI)
-	var max_step := turn_speed * delta
-	_facing = _facing.rotated(clamp(diff, -max_step, max_step))
+		var target_dir := InputBridge.aim_vector.normalized()
+		var diff := wrapf(target_dir.angle() - _facing.angle(), -PI, PI)
+		var max_step := FACING_TURN_SPEED_AIMING * delta
+		_facing = _facing.rotated(clamp(diff, -max_step, max_step))
 
 
 func _nearest_wall_distance() -> float:
@@ -458,8 +456,17 @@ func _update_cover_and_peek() -> void:
 	_peeking = _in_cover and InputBridge.move_vector.length() > 0.15 and InputBridge.move_vector.length() < 0.6
 
 
+## Ameaças/civis já atingidos entram na exclusão — sem isso, a mira parava
+## num alvo já abatido em vez de passar pra o que estiver atrás dele.
 func _fire_exclude() -> Array[RID]:
-	return [player.get_rid()]
+	var ex: Array[RID] = [player.get_rid()]
+	for t in threats:
+		if t.get_meta("hit"):
+			ex.append(t.get_rid())
+	for nt in non_threats:
+		if nt.get_meta("hit"):
+			ex.append(nt.get_rid())
+	return ex
 
 
 func _update_aim_preview() -> void:
@@ -519,7 +526,7 @@ func _update_hud() -> void:
 		"walk_to_briefing":
 			status_label.text = tr("Objetivo: vá até a Capitã Okafor.")
 		"approach_door":
-			status_label.text = tr("Objetivo: arrombe a porta (toque=rápido, segurar=devagar).")
+			status_label.text = tr("Objetivo: chegue na porta e segure ARROMBAR até o anel ficar AZUL pra entrar em silêncio (ou solte antes disso pra entrar com força).")
 		"clearing":
 			status_label.text = tr("Ameaças neutralizadas: %d/%d — cuidado com quem não é ameaça.") % [_threats_hit, THREAT_COUNT]
 		"done":

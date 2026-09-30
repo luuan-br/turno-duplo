@@ -38,8 +38,7 @@ var _range_origin: Vector2
 
 var player: CharacterBody2D
 var _facing := Vector2.RIGHT
-const FACING_TURN_SPEED_AIMING := 6.0   ## era 9 — usuário pediu mais suave ainda
-const FACING_TURN_SPEED_IDLE := 2.5
+const FACING_TURN_SPEED_AIMING := 9.0   ## voltou de 6 pra 9 depois que manche/movimento foram desacoplados
 
 var okafor_marker: Node2D
 var theo_marker: Node2D
@@ -483,17 +482,14 @@ func _move_player() -> void:
 
 
 func _update_facing(delta: float) -> void:
-	var target_dir := _facing
-	var turn_speed := FACING_TURN_SPEED_IDLE
+	# Manches desacoplados: esquerdo só move, direito é o único jeito de
+	# mudar a mira. Sem tocar o manche direito, a mira congela onde
+	# estava (não segue mais a direção de movimento).
 	if InputBridge.aim_touching and InputBridge.aim_vector.length() > 0.15:
-		target_dir = InputBridge.aim_vector.normalized()
-		turn_speed = FACING_TURN_SPEED_AIMING
-	elif InputBridge.move_vector.length() > 0.15:
-		target_dir = InputBridge.move_vector.normalized()
-
-	var diff := wrapf(target_dir.angle() - _facing.angle(), -PI, PI)
-	var max_step := turn_speed * delta
-	_facing = _facing.rotated(clamp(diff, -max_step, max_step))
+		var target_dir := InputBridge.aim_vector.normalized()
+		var diff := wrapf(target_dir.angle() - _facing.angle(), -PI, PI)
+		var max_step := FACING_TURN_SPEED_AIMING * delta
+		_facing = _facing.rotated(clamp(diff, -max_step, max_step))
 
 
 ## Pegar arma na bancada — base do sistema futuro de pegar arma de
@@ -519,8 +515,14 @@ func _update_weapon_pickup() -> void:
 ## (a bancada é só decoração depois de pegar a arma, mas continua sendo
 ## um Area2D com colisão de verdade — sem excluir, um tiro mirado de
 ## volta pra entrada poderia "acertar" a bancada em vez de um alvo/parede).
+## Alvos já atingidos também entram na exclusão — sem isso, a mira parava
+## num alvo já abatido em vez de passar pra o que estiver atrás dele.
 func _fire_exclude() -> Array[RID]:
-	return [player.get_rid(), weapon_rack.get_rid()]
+	var ex: Array[RID] = [player.get_rid(), weapon_rack.get_rid()]
+	for t in targets:
+		if t.get_meta("hit"):
+			ex.append(t.get_rid())
+	return ex
 
 
 ## Calcula todo frame onde o tiro bateria SE fosse disparado agora — uma

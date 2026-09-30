@@ -10,6 +10,7 @@ var _held: Dictionary = {}
 var _just_pressed: Dictionary = {}
 var _just_released: Dictionary = {}
 var _hold_start_ms: Dictionary = {}
+var _last_hold_duration: Dictionary = {}
 
 ## Reivindicação de toque: quando duas zonas de toque se sobrepõem (ex.:
 ## manche direito e um botão perto do canto onde ele fica), sem isso os
@@ -59,6 +60,13 @@ func press(action: String) -> void:
 func release(action: String) -> void:
 	if _held.get(action, false):
 		_just_released[action] = true
+		# Captura a duração AQUI, antes de _held virar false — hold_time()
+		# já não serve mais depois disso (era o bug: quem lia o tempo
+		# depois de consume_just_released() sempre via 0.0, porque
+		# hold_time() se recusa a responder pra uma ação que não está mais
+		# "segurada". A porta sempre saía como "rápida" por causa disso,
+		# não importa quanto tempo o jogador segurasse de verdade).
+		_last_hold_duration[action] = hold_time(action)
 	_held[action] = false
 
 
@@ -70,6 +78,13 @@ func hold_time(action: String) -> float:
 	if not _held.get(action, false):
 		return 0.0
 	return (Time.get_ticks_msec() - _hold_start_ms.get(action, Time.get_ticks_msec())) / 1000.0
+
+
+## Duração do último toque completo (pressionar → soltar) numa ação —
+## use isso (não `hold_time`) pra decidir algo DEPOIS que o botão já foi
+## solto, como toque-rápido-vs-segurar ao abrir uma porta.
+func last_hold_time(action: String) -> float:
+	return _last_hold_duration.get(action, 0.0)
 
 
 func consume_just_pressed(action: String) -> bool:

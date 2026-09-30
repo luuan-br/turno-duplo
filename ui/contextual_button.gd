@@ -3,6 +3,13 @@ extends Control
 ## em vez de um único botão "AÇÃO" ambíguo fazendo tudo por toque/segurar,
 ## cada ação tem seu próprio botão nomeado, que o sandbox mostra/esconde
 ## conforme o que está por perto (porta, alvo, etc.).
+##
+## `show_hold_progress`: pra ações onde toque-rápido-vs-segurar muda o
+## resultado (ex.: arrombar rápido/barulhento vs. devagar/silencioso).
+## Sem isso, o jogador só descobre o que "segurar" fez DEPOIS de soltar —
+## testado no celular, ficou confuso. Com isso ligado, um anel preenche
+## enquanto o dedo fica no botão e muda de cor ao passar do limiar, dando
+## feedback em tempo real de qual resultado está prestes a acontecer.
 
 @export var action_name: String = "action"
 @export var radius: float = 50.0
@@ -10,12 +17,22 @@ extends Control
 @export var idle_color: Color = Color(1, 1, 1, 0.25)
 @export var pressed_color: Color = Color(1, 0.6, 0.2, 0.55)
 
+@export var show_hold_progress: bool = false
+@export var hold_threshold: float = 0.5
+@export var hold_ring_color_before: Color = Color(1.0, 0.6, 0.2, 0.9)   ## ainda vai ser rápido/barulhento se soltar agora
+@export var hold_ring_color_after: Color = Color(0.3, 0.7, 1.0, 0.9)    ## já passou do limiar — vai ser devagar/silencioso
+
 var _touch_index: int = -1
 var _pressed: bool = false
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+func _process(_delta: float) -> void:
+	if show_hold_progress and _pressed:
+		queue_redraw()
 
 
 func _input(event: InputEvent) -> void:
@@ -67,7 +84,21 @@ func _notification(what: int) -> void:
 
 func _draw() -> void:
 	var center := size * 0.5
-	draw_circle(center, radius, pressed_color if _pressed else idle_color)
+	var past_threshold := false
+	if show_hold_progress and _pressed:
+		past_threshold = InputBridge.hold_time(action_name) >= hold_threshold
+
+	var fill := pressed_color
+	if show_hold_progress and _pressed and past_threshold:
+		fill = hold_ring_color_after
+	draw_circle(center, radius, fill if _pressed else idle_color)
+
+	if show_hold_progress and _pressed:
+		var hold := InputBridge.hold_time(action_name)
+		var frac: float = clamp(hold / hold_threshold, 0.0, 1.0)
+		var ring_color := hold_ring_color_after if past_threshold else hold_ring_color_before
+		draw_arc(center, radius + 8.0, -PI * 0.5, -PI * 0.5 + TAU * frac, 24, ring_color, 4.0)
+
 	if label_text != "":
 		var font := ThemeDB.fallback_font
 		var font_size := 15
