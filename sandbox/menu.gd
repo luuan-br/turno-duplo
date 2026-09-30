@@ -38,16 +38,23 @@ func _ready() -> void:
 	mission3_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://missions/ato1_fase3_direcao.tscn"))
 	add_child(mission3_btn)
 
+	var mission4_btn := Button.new()
+	mission4_btn.text = "Missão: Ato 1, Fase 4 — Avaliação Final / Formatura (conteúdo real)"
+	mission4_btn.position = Vector2(40, 400)
+	mission4_btn.custom_minimum_size = Vector2(500, 60)
+	mission4_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://missions/ato1_fase4_formatura.tscn"))
+	add_child(mission4_btn)
+
 	var tatico_btn := Button.new()
 	tatico_btn.text = "Sandbox Tático (mover, cobertura, espiar, arrombar, mirar/atirar)"
-	tatico_btn.position = Vector2(40, 400)
+	tatico_btn.position = Vector2(40, 480)
 	tatico_btn.custom_minimum_size = Vector2(500, 60)
 	tatico_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://sandbox/tatico.tscn"))
 	add_child(tatico_btn)
 
 	var chase_btn := Button.new()
 	chase_btn.text = "Sandbox Perseguição (dirigir, freio de mão, PIT maneuver)"
-	chase_btn.position = Vector2(40, 480)
+	chase_btn.position = Vector2(40, 560)
 	chase_btn.custom_minimum_size = Vector2(500, 60)
 	chase_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://sandbox/perseguicao.tscn"))
 	add_child(chase_btn)
