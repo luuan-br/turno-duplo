@@ -5,3 +5,9 @@ res://missions/ato1_fase1_chegada.tscn::ffc6451395679c14a53cdc142cda48aa::179070
 res://missions/ato1_fase2_abordagem.tscn::7d9f728b5cde112b9074930899451926::1790706409::res://.godot/exported/133200997/export-e4f47c4b14e104e62456d5719ea9353f-ato1_fase2_abordagem.scn
 res://missions/ato1_fase3_direcao.tscn::d14577e9c1bc16e79a6dc0518f60f8a7::1790715363::res://.godot/exported/133200997/export-8e7aa50ae88f7222c1090c3ab1625928-ato1_fase3_direcao.scn
 res://missions/ato1_fase4_formatura.tscn::9b3aca547a2d90c4e34dd5720c3f2b99::1790775684::res://.godot/exported/133200997/export-556a2fc2c72f43319b40330ebdc11c51-ato1_fase4_formatura.scn
+res://missions/ato2_turno1_a_dupla.tscn::a2ead1366379e26f2efced6b29cd245f::1790837287::res://.godot/exported/133200997/export-df6e85c3ef88fde7d7ac0a1de5557381-ato2_turno1_a_dupla.scn
+res://missions/ato2_turno2_furto.tscn::6ef3956e174376074e4960a79045bd61::1790837337::res://.godot/exported/133200997/export-bc3d4f24bcaecd85d1149390a89dfa67-ato2_turno2_furto.scn
+res://missions/ato2_turno3_corrida.tscn::24898394978cf2008b2e84deb4655424::1790837381::res://.godot/exported/133200997/export-d5d7562b93def0ab2e05d6926a55739c-ato2_turno3_corrida.scn
+res://missions/ato2_turno4_semaforo.tscn::f9bdeed9d13a6014fbd30f676110f977::1790837446::res://.godot/exported/133200997/export-35890fa1a425ce1d270cf6778a0b7883-ato2_turno4_semaforo.scn
+res://missions/ato2_turno5_fora_de_servico.tscn::7560559dcca547664b23e2e7c1760333::1790837486::res://.godot/exported/133200997/export-ba73caebbf9f3f06107816b9e0b13e1e-ato2_turno5_fora_de_servico.scn
+res://missions/ato2_turno6_incidente.tscn::052afcdec257555889edc79848b2b1d8::1790837594::res://.godot/exported/133200997/export-fdc4c933d4a1ec41b2f7f45dacf727ba-ato2_turno6_incidente.scn

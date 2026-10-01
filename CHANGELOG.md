@@ -5,6 +5,16 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 ## [Não lançado]
 
 ### Adicionado
+- **Ato 2 (Novato nas Ruas) completo — os 6 turnos do `docs/ROTEIRO.md`**, construídos de uma vez (a pedido do usuário, feedback vem depois, por turno):
+  - **Turno 1 — A Dupla**: apresentação do Sgt. Ray Doyle (primeira vez em jogo), que passa a **seguir o jogador como parceiro** (companheiro simples via `move_toward`, não pathfinding de verdade). Primeira abordagem de trânsito termina numa **escolha binária** (de-escalar vs. autoridade, `ui/choice_prompt.gd` — novo) que ajusta `GameState.reputation`.
+  - **Turno 2 — O Furto que Não Era Nada**: chamado de furto pequeno, mecânica de **examinar** (botão contextual genérico, reaproveita o padrão de interação por proximidade). Chamado de rádio opcional planta uma semente pra depois via flag em `GameState`.
+  - **Turno 3 — Corrida a Pé**: primeiro uso real do sprint tático pra alcançar um suspeito fugindo — a velocidade dele fica entre o passo cauteloso e o sprint do jogador, então só dá pra alcançar carregando o sprint de verdade.
+  - **Turno 4 — Semáforo Cego**: primeiro PIT maneuver de verdade (fora do treino sem risco da Ato 1 Fase 3), reaproveitando a física de carro por contato físico. Primeira aparição (sem nome) do wheelman — tratada como um beat visual rápido, não uma segunda perseguição.
+  - **Turno 5 — Fora de Serviço**: cena opcional de bar, narrativa — escolha que ajusta `GameState.doyle_relationship`, e o Theo Marsh reaparece como colega de farda (rivalidade da Academia virando respeito).
+  - **Turno 6 — O Incidente**: fecha o Ato 2. O Doyle é ferido em serviço (evento roteirizado, não uma falha do jogador), o jogador neutraliza a ameaça e **examina a cena**, achando uma pista que não fecha — gancho pro Ato 3. Transferência pra Investigações.
+- **`autoload/game_state.gd`** (novo autoload): estado que atravessa cenas — necessário a partir do Ato 2, já que os medidores (reputação, relação com o Doyle) se acumulam ao longo de vários turnos, não cabem mais numa missão isolada como no Ato 1. Não é save em disco, só sobrevive dentro da mesma sessão.
+- **`ui/choice_prompt.gd`** (novo): prompt de escolha binária reutilizável — não é o Modo Diálogo completo (ainda não prototipado), só o necessário pra uma decisão alimentar um medidor.
+- **Menu com rolagem** (`sandbox/menu.gd` reescrito como `ScrollContainer` + lista orientada a dados) — necessário a partir de 10+ missões, não cabia mais numa tela de celular sem rolar.
 - Documento de design (`docs/GDD.md`) e história resumida por ato/fase (`docs/ROTEIRO.md`).
 - Projeto Godot 4.7, Android como plataforma primária. Export preset Android, build clássico sem Gradle (`export_presets.cfg`) — gera `build/android/turno-duplo.apk`.
 - Camada de input abstraída por ação (`autoload/input_bridge.gd`), com reivindicação de toque compartilhada (`try_claim_touch`/`release_touch`) pra evitar conflito entre manches e botões com zonas sobrepostas.
