@@ -19,3 +19,10 @@ res://missions/ato3_fase5_jantar.tscn::7074bffab59ad7b4d4cd569bd5e9b3d8::1790918
 res://missions/ato3_fase6_ligacao.tscn::79fb2cb5a4dfeb36b601a391e4a509ba::1790918507::res://.godot/exported/133200997/export-afc8b8acf2cd1f34a944a1446de9042a-ato3_fase6_ligacao.scn
 res://missions/ato3_fase7_aviso.tscn::8bbd250551b60174ce33d11d1c77c5d2::1790918540::res://.godot/exported/133200997/export-5c92af0d5b8c07628f74bb88c97f0d6c-ato3_fase7_aviso.scn
 res://missions/ato3_fase8_descoberto.tscn::ff85da7b10d40e7014dc1efa98f4c0ed::1790918588::res://.godot/exported/133200997/export-acf575deec6cd363e468704b9ab30546-ato3_fase8_descoberto.scn
+res://missions/ato4_epilogo.tscn::adcbb38870a29e55561173b0be7ebb1a::1790948653::res://.godot/exported/133200997/export-209289d806576ff825858c721463ccba-ato4_epilogo.scn
+res://missions/ato4_fase1_infiltrar.tscn::5b773e0b2a4b03c830782360eba36efb::1790948290::res://.godot/exported/133200997/export-c47ca4b7560ca4c2c13ac02da817e963-ato4_fase1_infiltrar.scn
+res://missions/ato4_fase2_perseguicao.tscn::3e124c30ef6c97267c274ae2fa5dd737::1790948338::res://.godot/exported/133200997/export-4c1fe77ee2feb1541c4d7fffc5e0496c-ato4_fase2_perseguicao.scn
+res://missions/ato4_fase3_extracao.tscn::692df296101bcc1b8c73eb1b5167c1ba::1790948386::res://.godot/exported/133200997/export-40f165db9c92e77b46de169ef404738b-ato4_fase3_extracao.scn
+res://missions/ato4_fase4_luzes.tscn::42ba498f41740e67585c6ee096809291::1790948448::res://.godot/exported/133200997/export-fe081f5df66cec4529805426adb28f47-ato4_fase4_luzes.scn
+res://missions/ato4_fase5_cofre.tscn::4028c70f60ed8a38dffa8e3cfc020083::1790948553::res://.godot/exported/133200997/export-2680ab4d2f5efe552c003af335cd25c0-ato4_fase5_cofre.scn
+res://missions/ato4_fase6_arquiteto.tscn::44b6cf23e7cedf6979eb601935e6746f::1790948623::res://.godot/exported/133200997/export-90d17ab7be354aefbca7605e4716cabe-ato4_fase6_arquiteto.scn

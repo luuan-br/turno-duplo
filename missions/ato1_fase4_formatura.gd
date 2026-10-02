@@ -33,9 +33,12 @@ var _ceremony_started := false
 
 var story: Control
 var status_label: Label
+var next_btn: Button
 var _controls_locked := true
 var _phase := "intro"
 ## intro -> walk_to_ceremony -> ceremony -> done
+
+const SCENE_PATH := "res://missions/ato1_fase4_formatura.tscn"
 
 
 func _ready() -> void:
@@ -150,6 +153,19 @@ func _build_hud() -> void:
 	layer.add_child(back)
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://sandbox/menu.tscn"))
 
+	next_btn = Button.new()
+	next_btn.text = tr("Próxima Fase >")
+	next_btn.anchor_top = 1.0
+	next_btn.anchor_bottom = 1.0
+	next_btn.anchor_right = 1.0
+	next_btn.offset_top = -60
+	next_btn.offset_bottom = -10
+	next_btn.offset_right = -16
+	next_btn.offset_left = -200
+	next_btn.visible = false
+	layer.add_child(next_btn)
+	next_btn.pressed.connect(func(): MissionFlow.advance(SCENE_PATH))
+
 
 func _build_controls() -> void:
 	var layer := CanvasLayer.new()
@@ -182,6 +198,7 @@ func _on_story_finished() -> void:
 			_controls_locked = false
 		"ceremony":
 			_phase = "done"
+			next_btn.visible = true
 
 
 func _on_ceremony_zone_entered(body: Node) -> void:

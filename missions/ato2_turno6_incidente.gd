@@ -43,9 +43,12 @@ var breach_btn: Control
 var examine_btn: Control
 var story: Control
 var status_label: Label
+var next_btn: Button
 var _controls_locked := true
 var _phase := "intro"
 ## intro -> approach -> breach -> ambush -> fight -> aftermath -> examine -> outro -> done
+
+const SCENE_PATH := "res://missions/ato2_turno6_incidente.tscn"
 
 var _aim_end := Vector2.ZERO
 var _aim_hit_threat := false
@@ -199,6 +202,19 @@ func _build_hud() -> void:
 	layer.add_child(back)
 	back.pressed.connect(func(): get_tree().change_scene_to_file("res://sandbox/menu.tscn"))
 
+	next_btn = Button.new()
+	next_btn.text = tr("Próxima Fase >")
+	next_btn.anchor_top = 1.0
+	next_btn.anchor_bottom = 1.0
+	next_btn.anchor_right = 1.0
+	next_btn.offset_top = -60
+	next_btn.offset_bottom = -10
+	next_btn.offset_right = -16
+	next_btn.offset_left = -200
+	next_btn.visible = false
+	layer.add_child(next_btn)
+	next_btn.pressed.connect(func(): MissionFlow.advance(SCENE_PATH))
+
 
 func _build_controls() -> void:
 	var layer := CanvasLayer.new()
@@ -275,6 +291,7 @@ func _on_story_finished() -> void:
 			_controls_locked = false
 		"outro":
 			_phase = "done"
+			next_btn.visible = true
 
 
 func _update_door() -> void:

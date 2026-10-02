@@ -24,6 +24,13 @@ const ENTRIES := [
 	["Missão: Ato 3, Fase 6 — A Ligação Impossível", "res://missions/ato3_fase6_ligacao.tscn"],
 	["Missão: Ato 3, Fase 7 — O Aviso", "res://missions/ato3_fase7_aviso.tscn"],
 	["Missão: Ato 3, Fase 8 — Descoberto", "res://missions/ato3_fase8_descoberto.tscn"],
+	["Missão: Ato 4, Fase 1 — Infiltrar o Cais", "res://missions/ato4_fase1_infiltrar.tscn"],
+	["Missão: Ato 4, Fase 2 — A Perseguição", "res://missions/ato4_fase2_perseguicao.tscn"],
+	["Missão: Ato 4, Fase 3 — Extração", "res://missions/ato4_fase3_extracao.tscn"],
+	["Missão: Ato 4, Fase 4 — Luzes de Volta", "res://missions/ato4_fase4_luzes.tscn"],
+	["Missão: Ato 4, Fase 5 — O Cofre", "res://missions/ato4_fase5_cofre.tscn"],
+	["Missão: Ato 4, Fase 6 — O Arquiteto", "res://missions/ato4_fase6_arquiteto.tscn"],
+	["Epílogo", "res://missions/ato4_epilogo.tscn"],
 	["Sandbox Tático (mover, cobertura, espiar, arrombar, mirar/atirar)", "res://sandbox/tatico.tscn"],
 	["Sandbox Perseguição (dirigir, freio de mão, PIT maneuver)", "res://sandbox/perseguicao.tscn"],
 ]
