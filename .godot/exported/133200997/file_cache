@@ -11,3 +11,11 @@ res://missions/ato2_turno3_corrida.tscn::24898394978cf2008b2e84deb4655424::17908
 res://missions/ato2_turno4_semaforo.tscn::f9bdeed9d13a6014fbd30f676110f977::1790837446::res://.godot/exported/133200997/export-35890fa1a425ce1d270cf6778a0b7883-ato2_turno4_semaforo.scn
 res://missions/ato2_turno5_fora_de_servico.tscn::7560559dcca547664b23e2e7c1760333::1790837486::res://.godot/exported/133200997/export-ba73caebbf9f3f06107816b9e0b13e1e-ato2_turno5_fora_de_servico.scn
 res://missions/ato2_turno6_incidente.tscn::052afcdec257555889edc79848b2b1d8::1790837594::res://.godot/exported/133200997/export-fdc4c933d4a1ec41b2f7f45dacf727ba-ato2_turno6_incidente.scn
+res://missions/ato3_fase1_cena_revisitada.tscn::1702baefa05b86bc470f16adab30cac6::1790918170::res://.godot/exported/133200997/export-2723bd175f6b1bb3d5d512b29063625b-ato3_fase1_cena_revisitada.scn
+res://missions/ato3_fase2_ironside.tscn::1d91c609988861652b71a0c34b861f14::1790918352::res://.godot/exported/133200997/export-6327215a02ccd8c9dd18459e5d65f303-ato3_fase2_ironside.scn
+res://missions/ato3_fase3_vigilancia.tscn::25b68aee344c20d027953707ba66b16a::1790918395::res://.godot/exported/133200997/export-82478db6738c4dfa6908528cde814495-ato3_fase3_vigilancia.scn
+res://missions/ato3_fase4_quadro.tscn::a6f699d8a3500b245ca9bed3d8b6d377::1790918436::res://.godot/exported/133200997/export-79409be21c74c0877822791ded100fb2-ato3_fase4_quadro.scn
+res://missions/ato3_fase5_jantar.tscn::7074bffab59ad7b4d4cd569bd5e9b3d8::1790918479::res://.godot/exported/133200997/export-4055189ff00c728a1f6efc1cdb1b2e1c-ato3_fase5_jantar.scn
+res://missions/ato3_fase6_ligacao.tscn::79fb2cb5a4dfeb36b601a391e4a509ba::1790918507::res://.godot/exported/133200997/export-afc8b8acf2cd1f34a944a1446de9042a-ato3_fase6_ligacao.scn
+res://missions/ato3_fase7_aviso.tscn::8bbd250551b60174ce33d11d1c77c5d2::1790918540::res://.godot/exported/133200997/export-5c92af0d5b8c07628f74bb88c97f0d6c-ato3_fase7_aviso.scn
+res://missions/ato3_fase8_descoberto.tscn::ff85da7b10d40e7014dc1efa98f4c0ed::1790918588::res://.godot/exported/133200997/export-acf575deec6cd363e468704b9ab30546-ato3_fase8_descoberto.scn

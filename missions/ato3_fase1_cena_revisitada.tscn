@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://missions/ato3_fase1_cena_revisitada.gd" id="1"]
+
+[node name="Ato3Fase1CenaRevisitada" type="Node2D"]
+script=ExtResource("1")

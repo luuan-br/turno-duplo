@@ -5,6 +5,17 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 ## [Não lançado]
 
 ### Adicionado
+- **Ato 3 (Emblema de Detetive) completo — as 8 fases do `docs/ROTEIRO.md`**, construídas de uma vez (mesmo padrão em lote do Ato 2; feedback vem depois, por fase):
+  - **Fase 1 — A Cena Revisitada**: Mark reabre o apartamento do Incidente (Ato 2, Turno 6) como detetive — mesma pista (roteador), agora lida como monitoramento profissional em vez de acaso. Marca a virada de modo (uniformizado → investigador); curta de propósito.
+  - **Fase 2 — Ironside, de Novo**: escolha entre dois informantes (**Lou** ou **Miko**) por onde o jogador anda primeiro (zona de proximidade, sem prompt) — define `GameState.informant_chosen`, que a Fase 4 usa pra variar um dos pares do quadro.
+  - **Fase 3 — Vigilância**: primeira fase sem confronto físico possível. Avançar entre 3 sombras ao longo de um beco sem entrar no cone de visão de um vigia que patrulha ida-e-volta; ser visto não é fail state — o vigia grita e o jogador recua pro início do trecho.
+  - **Fase 4 — O Quadro de Evidências**: primeiro uso real do **`ui/evidence_board.gd`** (novo componente — minigame de conectar pares de pista tocando dois de cada vez). Fecha o Movimento 2 do ato nomeando o wheelman: `GameState.ghost_named = true`.
+  - **Fase 5 — Jantar Perdido**: vinheta doméstica opcional (mesma função do Turno 5 do Ato 2 — fase sem mecânica nova, majoritariamente narrativa) — escolha binária ajusta `GameState.family_meter` (ficar pro jantar vs. voltar pro caso).
+  - **Fase 6 — A Ligação Impossível**: Mark acha uma ligação do número do Doyle minutos antes do Incidente. Escolha de **3 vias** (`ui/choice_prompt.gd` suporta até 3 opções) define `GameState.doyle_fate` ("entregue", "saida" ou "confronto") e ajusta `doyle_relationship` — peso aparece no Ato 4, sem ramificar a estrutura de missão aqui.
+  - **Fase 7 — O Aviso**: abre o Movimento 3 (Confronto). Primeira presença concreta do Kessler na vida de Mark, ainda sem nome — um envelope com foto da Sarah e da Emma, deixado dentro de casa trancada. Examine-only, sem combate, de propósito (dread, não ação).
+  - **Fase 8 — Descoberto**: fecha o Ato 3. Tentativa de invasão de verdade em casa — Mark corre até lá (reaproveita o sprint do Ato 2 Turno 3) e encontra o Theo Marsh já na cena, pagando o touchpoint plantado no Ato 2 Turno 5. Família segura mas abalada; gancho direto pro Ato 4.
+  - `autoload/game_state.gd` expandido com `family_meter`, `informant_chosen`, `doyle_fate`, `ghost_named`.
+  - `sandbox/menu.gd` ganhou as 8 entradas novas.
 - **Ato 2 (Novato nas Ruas) completo — os 6 turnos do `docs/ROTEIRO.md`**, construídos de uma vez (a pedido do usuário, feedback vem depois, por turno):
   - **Turno 1 — A Dupla**: apresentação do Sgt. Ray Doyle (primeira vez em jogo), que passa a **seguir o jogador como parceiro** (companheiro simples via `move_toward`, não pathfinding de verdade). Primeira abordagem de trânsito termina numa **escolha binária** (de-escalar vs. autoridade, `ui/choice_prompt.gd` — novo) que ajusta `GameState.reputation`.
   - **Turno 2 — O Furto que Não Era Nada**: chamado de furto pequeno, mecânica de **examinar** (botão contextual genérico, reaproveita o padrão de interação por proximidade). Chamado de rádio opcional planta uma semente pra depois via flag em `GameState`.
