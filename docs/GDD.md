@@ -195,6 +195,15 @@ Essa estrutura por distritos também permite reaproveitar cenários entre atos c
 - **Freio de mão/PIT**: segurar aperta a curva (derrapagem); encostado atrás de um alvo e segurando, tenta o **PIT maneuver** (giro forçado no carro-alvo, ecoando WSPC).
 - **Atirar dirigindo** (Ato 4, mecânica de maestria): usa **mira automática** — quando um alvo entra num cone à frente do carro e dentro do alcance, a mira trava sozinha e um botão "Atirar" aparece. O jogador nunca aponta manualmente enquanto dirige (empilhar dirigir + mirar manual não funcionou nos testes).
 
+### Risco e consequência no combate tático (decisão confirmada com o usuário)
+O usuário jogou o Ato 4 inteiro e deu o feedback: "tudo parece simples demais, pouca gameplay e ação". Diagnóstico: não é falta de missão, é que o combate tático (repetido em 10+ fases) nunca teve risco — inimigos ficam parados esperando o tiro, não reagem, não atiram de volta, o jogador é imortal. Decisões fechadas antes de prototipar:
+- **Vida do jogador passa a existir de verdade** no combate tático, com inimigos que detectam por linha de visão (mesmo raio físico do tiro, invertido), patrulham até detectar, e atiram de volta em intervalos.
+- **Cobertura vira física real, não só indicador visual**: se uma parede estiver entre o inimigo e o jogador, o raio do inimigo bate nela e não chega — a mesma geometria que já bloqueia o tiro do jogador agora protege o jogador também.
+- **Consequência é suave, não fail state clássico**: vida chegando a zero não reinicia a missão — o jogador fica "atordoado" (sem controle) por alguns segundos e volta com 1 de vida. Mantém a filosofia "sem XP/loja/grind, sem punição dura" (Seção 11) em vez de introduzir um ciclo de tentativa-e-erro que o resto do jogo nunca teve.
+- **Prototipado primeiro no sandbox** (`sandbox/tatico.gd`), não direto nas missões reais — é mudança de sistema compartilhado por 10+ fases já aprovadas, risco de regressão alto demais pra pular a validação.
+
+Pendência aberta: decidir **se e como espalhar** esse sistema pras missões reais depois que o piloto for testado no celular — pode ser retrofit nas fases de combate existentes, ou só nas fases novas/revisadas dali pra frente.
+
 ### Pendência: layout de controles configurável
 Ideia do usuário, ainda não implementada no protótipo (é um sistema à parte — editor de posição + salvar preferência — e não faz sentido misturar com validar o "feel" das mecânicas, que é o objetivo do protótipo atual): no jogo final, o jogador deve poder **reposicionar manches e botões onde achar melhor**, com uma disposição padrão definida por nós (a da Seção 8 acima) já pronta de fábrica. Fica pra quando o projeto sair da fase de sandbox pra UI de configurações de verdade.
 

@@ -15,6 +15,24 @@ extends Node2D
 ## - Duas portas: uma trancada (Arrombar) e uma destrancada (Abrir) —
 ##   o conjunto de ações muda conforme o estado do objeto.
 ## GDD Seção 8.
+##
+## Piloto de "combate com risco real" (pedido do usuário depois de achar
+## o tático simples demais — inimigo parado, sem dano, sem cobertura de
+## verdade). Validando aqui antes de espalhar pras 10+ missões que
+## reaproveitam esse controlador:
+## - **Vida do jogador** (`PLAYER_MAX_HEALTH`): o inimigo atira de volta
+##   e reduz vida de verdade.
+## - **Inimigo com IA simples**: patrulha entre 2 pontos até detectar o
+##   Mark por raycast de linha de visão (mesmo mecanismo do tiro do
+##   jogador, só invertido); detectado, para e atira em intervalos.
+## - **Cobertura de verdade**: o raio do inimigo é física real — se uma
+##   parede estiver no caminho, o tiro é bloqueado antes de chegar no
+##   Mark. Não é mais só um indicador visual (`_in_cover`), é proteção
+##   de fato.
+## - **Consequência suave, não fail state** (decisão confirmada com o
+##   usuário): vida chegando a zero não reinicia nada — Mark fica
+##   "staggered" (sem controle) por alguns segundos, depois volta com 1
+##   de vida. Mantém a filosofia "sem punição dura" do resto do jogo.
 
 const ROOM_SIZE := Vector2(700.0, 420.0)
 const ROOM_ORIGIN := Vector2(130.0, 60.0)
@@ -34,7 +52,18 @@ const DOOR_INTERACT_DIST := 60.0
 
 const FACING_TURN_SPEED_AIMING := 9.0   ## rad/s enquanto o manche direito está sendo arrastado — voltou de 6 pra 9 depois que manche/movimento foram desacoplados
 
+const PLAYER_MAX_HEALTH := 4
+const STAGGER_DURATION := 2.0
+const ENEMY_DETECT_RANGE := 500.0
+const ENEMY_REACTION_DELAY := 0.6
+const ENEMY_FIRE_INTERVAL := 1.3
+const ENEMY_PATROL_SPEED := 45.0
+const SHOT_LINE_DURATION := 0.25
+
 var player: CharacterBody2D
+var player_health := PLAYER_MAX_HEALTH
+var _staggered := false
+var _stagger_timer := 0.0
 var door1_body: StaticBody2D  ## trancada — precisa arrombar
 var door1_open := false
 var door2_body: StaticBody2D  ## destrancada — só abrir
@@ -46,6 +75,16 @@ var lamp: Area2D
 var lamp_on := true
 var crate: Area2D
 var crate_broken := false
+
+var enemy: Area2D
+var enemy_hit := false
+var enemy_alert := false
+var enemy_reaction_timer := 0.0
+var enemy_fire_timer := 0.0
+var enemy_patrol_a: Vector2
+var enemy_patrol_b: Vector2
+var enemy_patrol_target: Vector2
+var _shot_line: Dictionary = {}  ## {from, to, timer} — feedback visual breve de quando o inimigo atira
 
 # Preview da mira: raio calculado todo frame (não só ao atirar), pra
 # mostrar exatamente onde o tiro vai bater — sem isso, a direção do tiro
@@ -60,6 +99,7 @@ var _peeking := false
 var _facing := Vector2.RIGHT
 
 var status_label: Label
+var health_label: Label
 var breach_btn: Control
 var open_btn: Control
 var fire_btn: Control
@@ -70,6 +110,7 @@ func _ready() -> void:
 	_build_player()
 	_build_doors()
 	_build_objects()
+	_build_enemy()
 	_build_hud()
 	_build_controls()
 
@@ -184,6 +225,25 @@ func _build_objects() -> void:
 	add_child(crate)
 
 
+## Inimigo de verdade: patrulha, detecta por linha de visão, atira de
+## volta. Posicionado do outro lado da "quina solta" do meio da sala —
+## dá pro jogador usar aquela parede como cobertura de propósito, não só
+## decoração.
+func _build_enemy() -> void:
+	enemy = Area2D.new()
+	var shape := CollisionShape2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = 15.0
+	shape.shape = circle
+	enemy.add_child(shape)
+	enemy_patrol_a = ROOM_ORIGIN + Vector2(ROOM_SIZE.x * 0.78, ROOM_SIZE.y * 0.3)
+	enemy_patrol_b = ROOM_ORIGIN + Vector2(ROOM_SIZE.x * 0.78, ROOM_SIZE.y * 0.7)
+	enemy.position = enemy_patrol_a
+	enemy_patrol_target = enemy_patrol_b
+	enemy.monitorable = true
+	add_child(enemy)
+
+
 func _build_hud() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
@@ -191,6 +251,12 @@ func _build_hud() -> void:
 	status_label.position = Vector2(16, 16)
 	status_label.add_theme_font_size_override("font_size", 17)
 	layer.add_child(status_label)
+
+	health_label = Label.new()
+	health_label.position = Vector2(16, 120)
+	health_label.add_theme_font_size_override("font_size", 20)
+	health_label.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
+	layer.add_child(health_label)
 
 	var back := Button.new()
 	back.text = "< Menu"
@@ -268,14 +334,29 @@ func _corner_button(action: String, label: String, right: float, bottom: float, 
 # ---------- lógica de jogo ----------
 
 func _process(delta: float) -> void:
-	_move_player(delta)
-	_update_facing(delta)
+	if _staggered:
+		_update_stagger(delta)
+	else:
+		_move_player(delta)
+		_update_facing(delta)
 	_update_cover_and_peek()
 	_update_doors()
 	_update_aim_preview()
 	_update_fire()
+	_update_enemy(delta)
+	if _shot_line.size() > 0:
+		_shot_line["timer"] -= delta
+		if _shot_line["timer"] <= 0.0:
+			_shot_line.clear()
 	_update_hud()
 	queue_redraw()
+
+
+func _update_stagger(delta: float) -> void:
+	_stagger_timer -= delta
+	if _stagger_timer <= 0.0:
+		_staggered = false
+		player_health = 1
 
 
 func _move_player(delta: float) -> void:
@@ -346,7 +427,86 @@ func _fire_exclude() -> Array[RID]:
 	var ex: Array[RID] = [player.get_rid()]
 	if target_hit:
 		ex.append(target.get_rid())
+	if enemy_hit:
+		ex.append(enemy.get_rid())
 	return ex
+
+
+# ---------- inimigo: patrulha, detecta, atira de volta ----------
+
+func _update_enemy(delta: float) -> void:
+	if enemy_hit:
+		return
+	if not enemy_alert:
+		_patrol_enemy(delta)
+		_check_enemy_detect()
+	else:
+		_check_enemy_fire(delta)
+
+
+func _patrol_enemy(delta: float) -> void:
+	var to_target := enemy_patrol_target - enemy.position
+	if to_target.length() < 6.0:
+		enemy_patrol_target = enemy_patrol_a if enemy_patrol_target.is_equal_approx(enemy_patrol_b) else enemy_patrol_b
+		to_target = enemy_patrol_target - enemy.position
+	enemy.position = enemy.position.move_toward(enemy_patrol_target, ENEMY_PATROL_SPEED * delta)
+
+
+## Mesmo raio de física real do tiro do jogador, só que partindo do
+## inimigo — se uma parede (ou a "quina solta") estiver no caminho, o
+## raio bate nela antes de chegar no Mark, e a detecção simplesmente não
+## acontece. É isso que torna a cobertura real, não só visual.
+func _check_enemy_detect() -> void:
+	var to_player := player.position - enemy.position
+	if to_player.length() > ENEMY_DETECT_RANGE:
+		return
+	var space_state := get_world_2d().direct_space_state
+	var query := PhysicsRayQueryParameters2D.create(enemy.position, player.position)
+	query.collide_with_areas = true
+	query.collide_with_bodies = true
+	query.exclude = [enemy.get_rid()]
+	var result := space_state.intersect_ray(query)
+	if not result.is_empty() and result.collider == player:
+		enemy_alert = true
+		enemy_reaction_timer = ENEMY_REACTION_DELAY
+		enemy_fire_timer = 0.0
+
+
+func _check_enemy_fire(delta: float) -> void:
+	if enemy_reaction_timer > 0.0:
+		enemy_reaction_timer -= delta
+		return
+	enemy_fire_timer -= delta
+	if enemy_fire_timer > 0.0:
+		return
+	enemy_fire_timer = ENEMY_FIRE_INTERVAL
+
+	var space_state := get_world_2d().direct_space_state
+	var query := PhysicsRayQueryParameters2D.create(enemy.position, player.position)
+	query.collide_with_areas = true
+	query.collide_with_bodies = true
+	query.exclude = [enemy.get_rid()]
+	var result := space_state.intersect_ray(query)
+
+	var hit_point: Vector2 = result.position if not result.is_empty() else player.position
+	_shot_line = {"from": enemy.position, "to": hit_point, "timer": SHOT_LINE_DURATION}
+
+	if not result.is_empty() and result.collider == player:
+		_on_player_hit()
+	else:
+		status_label.text = "O inimigo atirou, mas a cobertura bloqueou o tiro."
+
+
+func _on_player_hit() -> void:
+	if _staggered:
+		return
+	player_health -= 1
+	if player_health <= 0:
+		_staggered = true
+		_stagger_timer = STAGGER_DURATION
+		status_label.text = "Mark foi atingido e perdeu o fôlego — sem controle por um instante, não é fim de jogo."
+	else:
+		status_label.text = "Mark foi atingido! Vida: %d/%d." % [player_health, PLAYER_MAX_HEALTH]
 
 
 func _update_aim_preview() -> void:
@@ -367,7 +527,8 @@ func _update_aim_preview() -> void:
 
 
 func _update_fire() -> void:
-	if not InputBridge.consume_just_pressed("shoot"):
+	var pressed_shoot := InputBridge.consume_just_pressed("shoot")
+	if _staggered or not pressed_shoot:
 		return
 
 	var space_state := get_world_2d().direct_space_state
@@ -390,6 +551,10 @@ func _update_fire() -> void:
 		if not target_hit:
 			target_hit = true
 			status_label.text = "ALVO ATINGIDO."
+	elif collider == enemy:
+		if not enemy_hit:
+			enemy_hit = true
+			status_label.text = "Ameaça neutralizada — o inimigo não atira mais."
 	elif collider == lamp:
 		lamp_on = not lamp_on
 		status_label.text = "Luminária desligada — escureceu a sala (uso tático)." if not lamp_on else "Luminária ligada de novo."
@@ -402,6 +567,8 @@ func _update_fire() -> void:
 
 
 func _update_hud() -> void:
+	health_label.text = "Vida: %d/%d%s" % [player_health, PLAYER_MAX_HEALTH, "  (ATORDOADO)" if _staggered else ""]
+
 	if status_label.text != "" and not status_label.text.begins_with("Estado:"):
 		return
 	var state := "cauteloso"
@@ -411,15 +578,18 @@ func _update_hud() -> void:
 		state = "espiando"
 	elif _in_cover:
 		state = "em cobertura"
-	status_label.text = "Estado: %s\nEsquerda SÓ move. Direita SÓ mira (segure pra apontar; solte e a mira congela onde estava, não segue mais o movimento).\nATIRAR sempre disponível — acerta o que estiver na mira: parede, alvo, luminária, caixa.\nPorta de cima é destrancada (ABRIR); porta da direita é trancada — segure ARROMBAR até o anel ficar AZUL pra entrar em silêncio; solte antes disso pra entrar com força." % state
+	var enemy_state := "patrulhando" if not enemy_hit and not enemy_alert else ("neutralizado" if enemy_hit else "ATIRANDO — use parede como cobertura")
+	status_label.text = "Estado: %s | Inimigo: %s\nEsquerda SÓ move. Direita SÓ mira (segure pra apontar; solte e a mira congela onde estava, não segue mais o movimento).\nATIRAR sempre disponível — acerta o que estiver na mira: parede, alvo, inimigo, luminária, caixa.\nPorta de cima é destrancada (ABRIR); porta da direita é trancada — segure ARROMBAR até o anel ficar AZUL pra entrar em silêncio; solte antes disso pra entrar com força." % [state, enemy_state]
 
 
 func _draw() -> void:
 	if player:
 		var color := Color(0.9, 0.3, 0.3)
-		if _in_cover:
+		if _staggered:
+			color = Color(0.6, 0.1, 0.6)
+		elif _in_cover:
 			color = Color(0.3, 0.6, 0.9)
-		if _peeking:
+		elif _peeking:
 			color = Color(0.9, 0.8, 0.2)
 		draw_circle(player.position, PLAYER_RADIUS, color)
 
@@ -430,6 +600,15 @@ func _draw() -> void:
 		if _sprint_charge > 0.05 and _sprint_charge < SPRINT_CHARGE_TIME:
 			var frac := _sprint_charge / SPRINT_CHARGE_TIME
 			draw_arc(player.position, PLAYER_RADIUS + 7.0, -PI * 0.5, -PI * 0.5 + TAU * frac, 24, Color.YELLOW, 3.0)
+
+	if enemy and not enemy_hit:
+		var enemy_color := Color(0.85, 0.25, 0.25) if enemy_alert else Color(0.6, 0.5, 0.2)
+		draw_circle(enemy.position, 15.0, enemy_color)
+	elif enemy:
+		draw_circle(enemy.position, 15.0, Color(0.2, 0.2, 0.2))
+
+	if _shot_line.size() > 0:
+		draw_dashed_line(_shot_line["from"], _shot_line["to"], Color(1.0, 0.5, 0.1, 0.9), 2.5, 6.0)
 
 	if door1_body:
 		draw_circle(door1_body.position, 8.0, Color.GREEN if door1_open else Color(0.7, 0.15, 0.15))

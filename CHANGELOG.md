@@ -5,6 +5,12 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 ## [Não lançado]
 
 ### Adicionado
+- **Piloto de "combate com risco real" no `sandbox/tatico.gd`** — resposta ao feedback do usuário de que o tático, apesar de aprovado nos controles, "parece simples demais, pouca gameplay e ação": inimigos ficavam parados esperando o tiro, sem reagir, sem dano ao jogador. Prototipado no sandbox antes de espalhar pras 10+ missões reais que reaproveitam esse controlador (decisão confirmada com o usuário — mudança de sistema, não conteúdo):
+  - **Vida do jogador** (`PLAYER_MAX_HEALTH = 4`), com HUD dedicado.
+  - **Inimigo com IA simples**: patrulha entre 2 pontos até detectar o Mark por raycast de linha de visão (mesmo raio físico do tiro do jogador, invertido); detectado, para e atira em intervalos.
+  - **Cobertura de verdade**: o raio do inimigo é física real — uma parede no caminho bloqueia o tiro antes de chegar no jogador. A "quina solta" do meio da sala (decorativa até agora) ganhou função tática real.
+  - **Consequência suave, não fail state** (decisão explícita do usuário — mantém a filosofia "sem punição dura" do resto do jogo): vida a zero não reinicia nada, Mark fica "atordoado" (sem controle) por ~2s e volta com 1 de vida.
+  - Ainda **não aplicado** nas missões reais — só no sandbox, pra validar o "feel" antes de decidir se/como espalhar.
 - **Ato 4 (A Cidade em Chamas) completo — as 6 fases + epílogo do `docs/ROTEIRO.md`**, construídas de uma vez a pedido do usuário, que pediu nessa mesma leva pra resolver o incômodo de ficar voltando pro menu entre uma fase e outra:
   - **Fase 1 — Infiltrar o Cais**: o Theo Marsh assume oficialmente como parceiro de ação (Doyle fora de combate). Primeiro confronto real contra ameaças de Kessler — reaproveita o controlador tático validado, 4ª cópia de propósito (ver nota da "regra dos três" abaixo).
   - **Fase 2 — A Perseguição**: primeiro confronto direto com Wade "Ghost" Calloway. Resolve **duas pendências antigas da Seção 8 do GDD de uma vez**: "atirar dirigindo" (mira automática por cone à frente do carro, sem apontar manual) e "múltiplas formas de encerrar perseguição" — aqui, bater até acumular dano OU atirar no pneu quando alinhado, não só PIT.
