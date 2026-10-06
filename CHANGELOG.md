@@ -5,12 +5,14 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 ## [Não lançado]
 
 ### Adicionado
-- **Piloto de "combate com risco real" no `sandbox/tatico.gd`** — resposta ao feedback do usuário de que o tático, apesar de aprovado nos controles, "parece simples demais, pouca gameplay e ação": inimigos ficavam parados esperando o tiro, sem reagir, sem dano ao jogador. Prototipado no sandbox antes de espalhar pras 10+ missões reais que reaproveitam esse controlador (decisão confirmada com o usuário — mudança de sistema, não conteúdo):
-  - **Vida do jogador** (`PLAYER_MAX_HEALTH = 4`), com HUD dedicado.
-  - **Inimigo com IA simples**: patrulha entre 2 pontos até detectar o Mark por raycast de linha de visão (mesmo raio físico do tiro do jogador, invertido); detectado, para e atira em intervalos.
-  - **Cobertura de verdade**: o raio do inimigo é física real — uma parede no caminho bloqueia o tiro antes de chegar no jogador. A "quina solta" do meio da sala (decorativa até agora) ganhou função tática real.
-  - **Consequência suave, não fail state** (decisão explícita do usuário — mantém a filosofia "sem punição dura" do resto do jogo): vida a zero não reinicia nada, Mark fica "atordoado" (sem controle) por ~2s e volta com 1 de vida.
-  - Ainda **não aplicado** nas missões reais — só no sandbox, pra validar o "feel" antes de decidir se/como espalhar.
+- **Piloto de "combate com risco real" no `sandbox/tatico.gd`** — resposta ao feedback do usuário de que o tático "parece simples demais, pouca gameplay e ação" (inimigos parados, sem reagir, sem dano ao jogador). Já na 2ª versão, refeita a partir do retorno do 1º teste no celular:
+  - **`actors/enemy_guard.gd` (novo, reutilizável)**: guarda com cone de visão fixo (~70°), medidor de detecção (mais rápido de perto), patrulha com pausa nos pontos, investiga barulho, perde o jogador atrás de parede e vai procurar na última posição conhecida, enxerga bem menos no escuro, e mostra a linha de mira ~0,7s antes de atirar. Primeira peça do componente de combate compartilhado que vai pras missões.
+  - **Um tiro derruba, a menos que esteja de colete** (aguenta 2). Colete fica no canto esquerdo da sala pra testar os dois casos. Derrubado = o encontro recomeça.
+  - **Som**: tiro, sprint, caixa, luminária e arrombar rápido fazem barulho (anel na tela mostra o alcance); arrombar devagar é silencioso; parede abafa. Quebrar a caixa de longe distrai os guardas.
+  - **Escuro**: apagar a luminária escurece a sala e encurta muito a visão dos guardas.
+  - **Dois guardas** em rotas diferentes, com o canto inicial fora dos cones.
+  - **Mira**: suavização exponencial no lugar da taxa fixa de giro (giro grande ficava lento, "travado"); **toque duplo no manche direito atira** (`double_tap_action` em `ui/virtual_joystick.gd`, desligado por padrão — só o sandbox liga por enquanto).
+  - Ainda **não aplicado** nas missões reais.
 - **Ato 4 (A Cidade em Chamas) completo — as 6 fases + epílogo do `docs/ROTEIRO.md`**, construídas de uma vez a pedido do usuário, que pediu nessa mesma leva pra resolver o incômodo de ficar voltando pro menu entre uma fase e outra:
   - **Fase 1 — Infiltrar o Cais**: o Theo Marsh assume oficialmente como parceiro de ação (Doyle fora de combate). Primeiro confronto real contra ameaças de Kessler — reaproveita o controlador tático validado, 4ª cópia de propósito (ver nota da "regra dos três" abaixo).
   - **Fase 2 — A Perseguição**: primeiro confronto direto com Wade "Ghost" Calloway. Resolve **duas pendências antigas da Seção 8 do GDD de uma vez**: "atirar dirigindo" (mira automática por cone à frente do carro, sem apontar manual) e "múltiplas formas de encerrar perseguição" — aqui, bater até acumular dano OU atirar no pneu quando alinhado, não só PIT.
@@ -54,7 +56,11 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 - Mira com linha de trajetória em tempo real (raio de física calculado todo frame, não só ao atirar) — mostra onde o tiro vai bater antes de disparar, e ignora alvos/ameaças/civis já neutralizados em vez de "parar" neles.
 - Textos de conteúdo real (`missions/`) preparados pra tradução futura via `tr()`; o sandbox de teste fica de fora de propósito (ferramenta descartável, não vai ao jogo final).
 
+### Mudado
+- **Revertida a decisão de "consequência suave"** no combate (1ª versão do piloto: 4 de vida, ficar atordoado ao zerar). Pedido do usuário: um tiro derruba, colete é o que dá margem. Registrado no GDD Seção 8.
+
 ### Corrigido
+- **Piloto de combate (1º teste no celular)**: guarda via em 360° e, depois do primeiro alerta, continuava enxergando o jogador atrás de parede — corrigido no `actors/enemy_guard.gd` (cone fixo + perde o rastro sem linha de visão).
 - **Ato 4, Fase 5 ("O Cofre") — retorno do 1º teste no celular:** dois bugs reais no trecho de fuga de carro. (1) A câmera não acompanhava o carro do jogador ao entrar nessa parte — a câmera tática antiga continuava "current" porque duas `Camera2D` com `enabled = true` ao mesmo tempo nem sempre trocam sozinhas de forma confiável; corrigido desativando a câmera tática explicitamente (`player_camera.enabled = false`) antes de ligar a do carro, em vez de confiar na troca automática. (2) O carro perseguidor nascia fora da pista (posição calculada caía antes da parede esquerda, fora da área jogável) — corrigido posicionando-o dentro da pista, atrás do carro do jogador. **Padrão a seguir:** ao trocar de câmera dentro da mesma cena (tático → veículo), desativar a câmera antiga explicitamente, nunca contar com troca automática só por `enabled = true`.
 - **Ato 4, Fase 5 ("O Cofre")**: o manche direito (mira tática) ficava visível por cima dos botões ACELERAR/FREAR/ATIRAR PRA TRÁS durante o trecho de fuga de carro — mesma classe de bug de sobreposição de toque já resolvida antes no tático (ver `InputBridge.try_claim_touch`). Corrigido escondendo o manche direito especificamente durante a fase de fuga, já que essa fase usa mira automática, não manual. Pego e corrigido antes do teste no celular.
 - Bug em `hold_time()` que fazia toque-rápido-vs-segurar sempre registrar como "rápido", não importa quanto tempo o jogador segurasse de verdade — corrigido com `last_hold_time()`, que captura a duração no instante do soltar.
