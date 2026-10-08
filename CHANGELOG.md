@@ -5,6 +5,17 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 ## [Não lançado]
 
 ### Adicionado
+- **Combate com risco real espalhado pras missões** (piloto aprovado no celular: "ficou muito bom"):
+  - **`actors/tactical_player.gd` (novo)**: o jogador tático virou componente — movimento, sprint com barulho, mira nova, toque duplo pra atirar, tiro por raio, colete e queda num lugar só. Substitui a lógica que estava copiada em cada missão de combate.
+  - **`actors/combat_layer.gd` (novo)**: liga jogador e guardas numa missão — cria os guardas, aplica o tiro que acerta, espalha barulho, desenha anéis de som/linhas de tiro, recomeça a missão quando o Mark cai. Guardas ficam pausados durante o diálogo e só ligam quando o combate começa.
+  - **Ato 4, Fase 1 (Infiltrar o Cais)**: 3 guardas entre contêineres (um vigia parado com a visão do portão cortada por um contêiner). Arrombar devagar entra em silêncio; rápido avisa os guardas. Theo segura o portão.
+  - **Ato 4, Fase 3 (Extração)**: casa com divisória e sofá de cobertura, 3 sequestradores — um vigia a família de frente pra passagem. Mark entra sozinho.
+  - **Ato 4, Fase 5 (O Cofre)**: 3 guardas e mesas de cobertura na sala do cofre (um parado ao lado do cofre). A fuga de carro não mudou.
+  - **Ato 4, Fase 6 (O Arquiteto)**: escolta de 4 guardas (2 parados ao lado do Kessler, 2 patrulhando) e consoles de cobertura. Kessler continua sendo detido, não baleado.
+  - **Ato 2, Turno 6 (O Incidente)**: emboscada de verdade — o atirador já começa em combate quando a porta abre, e um cúmplice nos fundos vem atrás do barulho. Colete de patrulha segura 1 tiro.
+  - Colete por ato: Ato 2 segura 1 tiro, Ato 4 segura 2. **Cair recomeça a missão do início** (decisão do usuário).
+- **"Pular >>" na caixa de diálogo** (`ui/story_box.gd`): encerra a sequência inteira — vale pra todas as missões, pensado pra não cansar repetir o diálogo depois de cair.
+- **`EnemyGuard.force_combat(pos)`**: guarda já começa em combate (emboscada).
 - **Piloto de "combate com risco real" no `sandbox/tatico.gd`** — resposta ao feedback do usuário de que o tático "parece simples demais, pouca gameplay e ação" (inimigos parados, sem reagir, sem dano ao jogador). Já na 2ª versão, refeita a partir do retorno do 1º teste no celular:
   - **`actors/enemy_guard.gd` (novo, reutilizável)**: guarda com cone de visão fixo (~70°), medidor de detecção (mais rápido de perto), patrulha com pausa nos pontos, investiga barulho, perde o jogador atrás de parede e vai procurar na última posição conhecida, enxerga bem menos no escuro, e mostra a linha de mira ~0,7s antes de atirar. Primeira peça do componente de combate compartilhado que vai pras missões.
   - **Um tiro derruba, a menos que esteja de colete** (aguenta 2). Colete fica no canto esquerdo da sala pra testar os dois casos. Derrubado = o encontro recomeça.
@@ -12,7 +23,7 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
   - **Escuro**: apagar a luminária escurece a sala e encurta muito a visão dos guardas.
   - **Dois guardas** em rotas diferentes, com o canto inicial fora dos cones.
   - **Mira**: suavização exponencial no lugar da taxa fixa de giro (giro grande ficava lento, "travado"); **toque duplo no manche direito atira** (`double_tap_action` em `ui/virtual_joystick.gd`, desligado por padrão — só o sandbox liga por enquanto).
-  - Ainda **não aplicado** nas missões reais.
+  - O sandbox agora usa os mesmos componentes das missões (é a referência viva do sistema) e cair recomeça a cena.
 - **Ato 4 (A Cidade em Chamas) completo — as 6 fases + epílogo do `docs/ROTEIRO.md`**, construídas de uma vez a pedido do usuário, que pediu nessa mesma leva pra resolver o incômodo de ficar voltando pro menu entre uma fase e outra:
   - **Fase 1 — Infiltrar o Cais**: o Theo Marsh assume oficialmente como parceiro de ação (Doyle fora de combate). Primeiro confronto real contra ameaças de Kessler — reaproveita o controlador tático validado, 4ª cópia de propósito (ver nota da "regra dos três" abaixo).
   - **Fase 2 — A Perseguição**: primeiro confronto direto com Wade "Ghost" Calloway. Resolve **duas pendências antigas da Seção 8 do GDD de uma vez**: "atirar dirigindo" (mira automática por cone à frente do carro, sem apontar manual) e "múltiplas formas de encerrar perseguição" — aqui, bater até acumular dano OU atirar no pneu quando alinhado, não só PIT.
@@ -60,6 +71,9 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 - **Revertida a decisão de "consequência suave"** no combate (1ª versão do piloto: 4 de vida, ficar atordoado ao zerar). Pedido do usuário: um tiro derruba, colete é o que dá margem. Registrado no GDD Seção 8.
 
 ### Corrigido
+- **Ato 4, Fase 6 (O Arquiteto)**: a parede direita da sala de controle estava aberta pro vazio acima e abaixo do corredor — fechada, a passagem agora é só o corredor.
+- **Ato 2, Turno 6**: removida a fala final "Ato 3 ainda não foi construído", que tinha ficado desatualizada.
+- **Toque duplo**: pegar o manche pra mirar logo depois de um toque duplo soltava um tiro a mais sem querer.
 - **Piloto de combate (1º teste no celular)**: guarda via em 360° e, depois do primeiro alerta, continuava enxergando o jogador atrás de parede — corrigido no `actors/enemy_guard.gd` (cone fixo + perde o rastro sem linha de visão).
 - **Ato 4, Fase 5 ("O Cofre") — retorno do 1º teste no celular:** dois bugs reais no trecho de fuga de carro. (1) A câmera não acompanhava o carro do jogador ao entrar nessa parte — a câmera tática antiga continuava "current" porque duas `Camera2D` com `enabled = true` ao mesmo tempo nem sempre trocam sozinhas de forma confiável; corrigido desativando a câmera tática explicitamente (`player_camera.enabled = false`) antes de ligar a do carro, em vez de confiar na troca automática. (2) O carro perseguidor nascia fora da pista (posição calculada caía antes da parede esquerda, fora da área jogável) — corrigido posicionando-o dentro da pista, atrás do carro do jogador. **Padrão a seguir:** ao trocar de câmera dentro da mesma cena (tático → veículo), desativar a câmera antiga explicitamente, nunca contar com troca automática só por `enabled = true`.
 - **Ato 4, Fase 5 ("O Cofre")**: o manche direito (mira tática) ficava visível por cima dos botões ACELERAR/FREAR/ATIRAR PRA TRÁS durante o trecho de fuga de carro — mesma classe de bug de sobreposição de toque já resolvida antes no tático (ver `InputBridge.try_claim_touch`). Corrigido escondendo o manche direito especificamente durante a fase de fuga, já que essa fase usa mira automática, não manual. Pego e corrigido antes do teste no celular.

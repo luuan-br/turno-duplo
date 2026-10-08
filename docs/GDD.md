@@ -202,7 +202,9 @@ O usuário jogou o Ato 4 inteiro e deu o feedback: "tudo parece simples demais, 
 
 **Revisão depois do 1º teste do piloto (retorno do usuário — substitui a 1ª versão, que tinha 4 de vida e "atordoado" ao zerar):**
 - **Um tiro derruba.** "Não tem por que o jogador ter mais de uma vida." A exceção é o **colete**: com ele o jogador aguenta alguns tiros (`VEST_HITS`, hoje 2), sem ele cai no primeiro. Colete encaixa na regra "equipamento muda automaticamente por ato" (Seção 11) — cada missão decide se o Mark está de colete, sem loja.
-- **Derrubado = o encontro recomeça.** Isso **reverte a decisão anterior de "consequência suave"**: com um tiro letal, ficar atordoado e voltar com vida não fazia sentido. Escopo do recomeço nas missões reais (desde o início da fase ou de um checkpoint antes do combate) ainda a decidir na hora de espalhar.
+- **Derrubado = a missão recomeça do início** (decisão do usuário, preferida a checkpoint antes do combate). Isso **reverte a decisão anterior de "consequência suave"**: com um tiro letal, ficar atordoado e voltar com vida não fazia sentido. Pra repetir o diálogo de abertura não ficar cansativo, **toda caixa de diálogo tem "Pular >>"**, que encerra a sequência inteira. Cuidado registrado: recomeçar recarrega a cena, então uma missão com combate **não pode** mexer em medidor do `GameState` antes do combate (contaria duas vezes) — nenhuma das atuais mexe.
+- **Colete por ato, sem loja** (Seção 11): Academia sem combate de risco; Ato 2 (patrulha) colete leve, segura 1 tiro; Ato 4 (ação) colete tático, segura 2.
+- **Onde já está aplicado:** Ato 4 Fases 1 (Infiltrar), 3 (Extração), 5 (Cofre, parte a pé) e 6 (Arquiteto), e Ato 2 Turno 6 (Incidente — o atirador já começa em combate, emboscada de verdade). A Academia (Ato 1) continua sem risco de propósito — é treino.
 - **Visão em cone fixo** (~70°, não 360°) e alcance limitado. Percepção não é instantânea: um medidor de detecção enche mais rápido de perto e mais devagar de longe — dá tempo de recuar se for visto de relance.
 - **Sem visão através de parede.** O guarda só acompanha o jogador enquanto tem linha de visão; perdeu, vai até a última posição conhecida e procura, depois volta pra patrulha. (Bug da 1ª versão: depois do primeiro alerta ele seguia mirando o jogador atrás de parede.)
 - **Escuro reduz a visão** (alcance cai bastante com a luminária apagada) — paga o "atirar na lâmpada" que já existia desde o 3º teste de controles.
@@ -210,7 +212,7 @@ O usuário jogou o Ato 4 inteiro e deu o feedback: "tudo parece simples demais, 
 - **Aviso antes do tiro**: o guarda mostra a linha de mira por ~0,7s antes de atirar. Com tiro letal, isso é o que torna a morte justa — o jogador tem tempo de sair da linha ou voltar pra cobertura.
 - **Mira mais solta e toque duplo pra atirar**: o giro da mira passou de taxa fixa (que deixava giro grande lento — "travado") pra suavização exponencial; tocar duas vezes no manche direito atira, além do botão ATIRAR. Por enquanto só ligado no sandbox (`double_tap_action` no manche), até ser aprovado.
 
-Pendência aberta: decidir **se e como espalhar** esse sistema pras missões reais depois que o piloto for testado no celular — pode ser retrofit nas fases de combate existentes, ou só nas fases novas/revisadas dali pra frente.
+Piloto aprovado no celular ("ficou muito bom") e espalhado pras missões de combate (ver "Onde já está aplicado" acima), usando os componentes compartilhados `actors/tactical_player.gd`, `actors/enemy_guard.gd` e `actors/combat_layer.gd`. Próximo alvo do mesmo problema ("simples demais"): as perseguições — o carro inimigo só foge, nunca ameaça.
 
 ### Pendência: layout de controles configurável
 Ideia do usuário, ainda não implementada no protótipo (é um sistema à parte — editor de posição + salvar preferência — e não faz sentido misturar com validar o "feel" das mecânicas, que é o objetivo do protótipo atual): no jogo final, o jogador deve poder **reposicionar manches e botões onde achar melhor**, com uma disposição padrão definida por nós (a da Seção 8 acima) já pronta de fábrica. Fica pra quando o projeto sair da fase de sandbox pra UI de configurações de verdade.
@@ -323,6 +325,8 @@ Escopo deliberadamente enxuto — cada personagem existe porque já tem uma fun�
 | 2 — Patrulha | Pistola de serviço, cassetete/taser, colete básico | Farda padrão de policial novato |
 | 3 — Detetive | Arma à paisana, kit de coleta de evidência, sem farda | Investigação, discrição |
 | 4 — Ação | Colete tático, arma emprestada/de operação (ex: carabina), acesso a equipamento requisitado pra crise | A noite exige mais do que o padrão — pedido/emprestado, não comprado |
+
+No combate com risco real (Seção 8), o colete tem efeito mecânico: o básico do Ato 2 segura 1 tiro, o tático do Ato 4 segura 2; sem colete, um tiro derruba.
 
 Isso entrega a sensação mobile de "ficar mais equipado com o tempo" sem abrir a porta pra uma loja ou pra grind — é *fixo* por ato, todo jogador tem o mesmo em cada ponto da história.
 

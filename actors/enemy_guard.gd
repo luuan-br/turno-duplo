@@ -108,6 +108,16 @@ func hear_noise(pos: Vector2, radius: float) -> void:
 	_start_investigate(pos, State.INVESTIGATE)
 
 
+## Emboscada: o guarda já sabe onde o jogador está (ex.: porta arrombada
+## na cara dele) — entra direto em combate, virado pra lá.
+func force_combat(at: Vector2) -> void:
+	if state == State.DEAD:
+		return
+	last_known = at
+	facing = (at - global_position).normalized()
+	_enter_combat()
+
+
 func vision_range() -> float:
 	return vision_range_dark if dark else vision_range_lit
 

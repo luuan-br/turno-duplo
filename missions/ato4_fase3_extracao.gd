@@ -1,35 +1,25 @@
 extends Node2D
 ## Ato 4, Fase 3 — "Extração" (docs/ROTEIRO.md). Desvio pessoal: Sarah e
 ## Emma estão em perigo direto, e Mark interrompe a caçada a Kessler pra
-## tirá-las de risco — o clímax pessoal do jogo, contrapeso ao clímax
-## público do Cofre/Arquiteto que vem depois. Reaproveita o controlador
-## tático validado (mesma ressalva da Fase 1 — ato 4 reaproveita de
-## propósito em vez de reinventar) e fecha com o botão "LIBERTAR"
-## genérico, no mesmo padrão do "EXAMINAR"/"ABRIR" já usado nos atos
-## anteriores.
+## tirá-las de risco — o clímax pessoal do jogo. Combate com risco real
+## (`actors/`): três sequestradores dentro de casa — um patrulha o
+## corredor, um ronda o cômodo dos fundos, um vigia a família parado de
+## frente pra passagem. Theo ficou segurando o Cais: aqui o Mark está
+## sozinho. Fecha com "LIBERTAR" (segurar), no padrão de "ARROMBAR".
 
-const ROOM_SIZE := Vector2(460.0, 360.0)
+const ROOM_SIZE := Vector2(620.0, 400.0)
 const ROOM_ORIGIN := Vector2(80.0, 60.0)
 const WALL_THICK := 20.0
-
-const PLAYER_RADIUS := 14.0
-const SPEED_CAUTIOUS := 90.0
-const PARTNER_FOLLOW_SPEED := 85.0
-const PARTNER_FOLLOW_DIST := 50.0
-const FIRE_RANGE := 900.0
 const INTERACT_DIST := 55.0
+const VEST_HITS := 2
+const WALL_COLOR := Color(0.26, 0.22, 0.24)
+const FURNITURE_COLOR := Color(0.36, 0.28, 0.3)
 
-var player: CharacterBody2D
-var theo_marker: Node2D
-
-var threat: Area2D
-var threat_hit := false
+var player: TacticalPlayer
+var combat: CombatLayer
 
 var family_obj: Area2D
 var _rescued := false
-
-var _facing := Vector2.RIGHT
-const FACING_TURN_SPEED_AIMING := 9.0
 
 var fire_btn: Control
 var rescue_btn: Control
@@ -38,21 +28,18 @@ var status_label: Label
 var next_btn: Button
 var _controls_locked := true
 var _phase := "intro"
-## intro -> fight -> aftermath -> rescue -> outro -> done
-
-var _aim_end := Vector2.ZERO
-var _aim_hit_threat := false
-var _aim_valid := false
+## intro -> fight -> aftermath -> rescue -> outro -> done (ou down -> recomeça)
 
 const SCENE_PATH := "res://missions/ato4_fase3_extracao.tscn"
 
 
 func _ready() -> void:
 	_build_room()
-	_build_player()
-	_build_theo()
-	_build_threat()
 	_build_family()
+	combat = CombatLayer.new()
+	add_child(combat)
+	_build_player()
+	_build_guards()
 	_build_hud()
 	_build_controls()
 	_build_story_box()
@@ -61,73 +48,45 @@ func _ready() -> void:
 		[
 			"O rádio de Mark cospe estática e, no meio dela, a voz de um dos homens de Kessler — um erro de canal, não mensagem pra ele.",
 			"\"A casa dos Reyes, segundo grupo. Mantém elas aí até a gente confirmar o Cofre.\"",
-			"Mark já está correndo antes do Theo terminar de processar a frase. \"Vai\", Theo diz. \"Eu seguro o resto sozinho se precisar.\"",
+			"Mark já está correndo antes do Theo terminar de processar a frase. \"Vai\", Theo diz. \"Eu seguro o Cais sozinho.\"",
+			"Na porta da própria casa, Mark ouve vozes que não são da família. Três, talvez. Ele entra sozinho.",
 		],
-		["", "", "Theo Marsh"]
+		["", "", "Theo Marsh", ""]
 	)
+
+
+# ---------- construção da cena ----------
+
+func _add_block(r: Rect2, color: Color) -> void:
+	var body := StaticBody2D.new()
+	var shape := CollisionShape2D.new()
+	var rect_shape := RectangleShape2D.new()
+	rect_shape.size = r.size
+	shape.shape = rect_shape
+	shape.position = r.size * 0.5
+	body.add_child(shape)
+	body.position = r.position
+	add_child(body)
+
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([Vector2.ZERO, Vector2(r.size.x, 0), r.size, Vector2(0, r.size.y)])
+	poly.color = color
+	poly.position = r.position
+	add_child(poly)
 
 
 func _build_room() -> void:
 	var o := ROOM_ORIGIN
 	var w := ROOM_SIZE.x
 	var h := ROOM_SIZE.y
-	var rects: Array[Rect2] = [
-		Rect2(o, Vector2(w, WALL_THICK)),
-		Rect2(Vector2(o.x, o.y + h - WALL_THICK), Vector2(w, WALL_THICK)),
-		Rect2(o, Vector2(WALL_THICK, h)),
-		Rect2(Vector2(o.x + w - WALL_THICK, o.y), Vector2(WALL_THICK, h)),
-	]
-	for r in rects:
-		var body := StaticBody2D.new()
-		var shape := CollisionShape2D.new()
-		var rect_shape := RectangleShape2D.new()
-		rect_shape.size = r.size
-		shape.shape = rect_shape
-		shape.position = r.size * 0.5
-		body.add_child(shape)
-		body.position = r.position
-		add_child(body)
-
-		var poly := Polygon2D.new()
-		poly.polygon = PackedVector2Array([Vector2.ZERO, Vector2(r.size.x, 0), r.size, Vector2(0, r.size.y)])
-		poly.color = Color(0.26, 0.22, 0.24)
-		poly.position = r.position
-		add_child(poly)
-
-
-func _build_player() -> void:
-	player = CharacterBody2D.new()
-	var shape := CollisionShape2D.new()
-	var circle := CircleShape2D.new()
-	circle.radius = PLAYER_RADIUS
-	shape.shape = circle
-	player.add_child(shape)
-	player.position = ROOM_ORIGIN + Vector2(60, ROOM_SIZE.y - 70)
-	add_child(player)
-
-	var camera := Camera2D.new()
-	camera.enabled = true
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 5.0
-	player.add_child(camera)
-
-
-func _build_theo() -> void:
-	theo_marker = Node2D.new()
-	theo_marker.position = player.position + Vector2(-30, 0)
-	add_child(theo_marker)
-
-
-func _build_threat() -> void:
-	threat = Area2D.new()
-	var shape := CollisionShape2D.new()
-	var circle := CircleShape2D.new()
-	circle.radius = 15.0
-	shape.shape = circle
-	threat.add_child(shape)
-	threat.position = ROOM_ORIGIN + Vector2(ROOM_SIZE.x * 0.5, ROOM_SIZE.y * 0.3)
-	threat.monitorable = true
-	add_child(threat)
+	_add_block(Rect2(o, Vector2(w, WALL_THICK)), WALL_COLOR)
+	_add_block(Rect2(Vector2(o.x, o.y + h - WALL_THICK), Vector2(w, WALL_THICK)), WALL_COLOR)
+	_add_block(Rect2(o, Vector2(WALL_THICK, h)), WALL_COLOR)
+	_add_block(Rect2(Vector2(o.x + w - WALL_THICK, o.y), Vector2(WALL_THICK, h)), WALL_COLOR)
+	# Divisória entre o corredor e os fundos — a passagem fica embaixo.
+	_add_block(Rect2(Vector2(o.x + w * 0.45, o.y), Vector2(WALL_THICK, h * 0.6)), WALL_COLOR)
+	# Sofá no cômodo dos fundos: cobertura no meio do caminho até a família.
+	_add_block(Rect2(o + Vector2(w * 0.7, h * 0.35), Vector2(70, 40)), FURNITURE_COLOR)
 
 
 func _build_family() -> void:
@@ -137,9 +96,31 @@ func _build_family() -> void:
 	circle.radius = 18.0
 	shape.shape = circle
 	family_obj.add_child(shape)
-	family_obj.position = ROOM_ORIGIN + Vector2(ROOM_SIZE.x - 90, ROOM_SIZE.y - 90)
+	family_obj.position = ROOM_ORIGIN + Vector2(ROOM_SIZE.x - 70, ROOM_SIZE.y - 70)
 	family_obj.monitorable = true
 	add_child(family_obj)
+
+
+func _build_player() -> void:
+	player = TacticalPlayer.new()
+	player.position = ROOM_ORIGIN + Vector2(60, ROOM_SIZE.y - 70)
+	player.set_vest(VEST_HITS)
+	# Tiro que passa do sequestrador não "acerta" a família — gray box, sem
+	# sistema de dano a civil aqui.
+	player.extra_exclude = [family_obj.get_rid()]
+	add_child(player)
+	combat.setup(player)
+	combat.player_downed.connect(_on_player_downed)
+	combat.all_guards_down.connect(_on_all_guards_down)
+
+
+func _build_guards() -> void:
+	var o := ROOM_ORIGIN
+	var w := ROOM_SIZE.x
+	var h := ROOM_SIZE.y
+	combat.add_guard([o + Vector2(60, 70), o + Vector2(w * 0.38, 70)])
+	combat.add_guard([o + Vector2(w - 160, h - 100)], Vector2.LEFT)
+	combat.add_guard([o + Vector2(w * 0.62, 60), o + Vector2(w * 0.62, h * 0.5)])
 
 
 func _build_hud() -> void:
@@ -190,6 +171,7 @@ func _build_controls() -> void:
 	var right_stick := Control.new()
 	right_stick.set_script(load("res://ui/virtual_joystick.gd"))
 	right_stick.right_stick = true
+	right_stick.double_tap_action = "shoot"
 	right_stick.anchor_left = 0.5
 	right_stick.anchor_right = 1.0
 	right_stick.anchor_top = 0.0
@@ -231,11 +213,14 @@ func _build_story_box() -> void:
 	story.finished.connect(_on_story_finished)
 
 
+# ---------- fluxo ----------
+
 func _on_story_finished() -> void:
 	match _phase:
 		"intro":
 			_phase = "fight"
 			_controls_locked = false
+			combat.set_active(true)
 		"aftermath":
 			_phase = "rescue"
 			_controls_locked = false
@@ -244,39 +229,18 @@ func _on_story_finished() -> void:
 			next_btn.visible = true
 
 
-func _check_fire() -> void:
+func _on_all_guards_down() -> void:
 	if _phase != "fight":
-		fire_btn.visible = false
 		return
-	fire_btn.visible = true
-
-	var space_state := get_world_2d().direct_space_state
-	var start := player.position + _facing * (PLAYER_RADIUS + 2.0)
-	var query := PhysicsRayQueryParameters2D.create(start, start + _facing * FIRE_RANGE)
-	query.collide_with_areas = true
-	query.collide_with_bodies = true
-	query.exclude = [player.get_rid()]
-	var result := space_state.intersect_ray(query)
-
-	_aim_valid = true
-	if result.is_empty():
-		_aim_end = start + _facing * FIRE_RANGE
-		_aim_hit_threat = false
-	else:
-		_aim_end = result.position
-		_aim_hit_threat = (result.collider == threat) and not threat_hit
-
-	if InputBridge.consume_just_pressed("shoot") and not result.is_empty() and result.collider == threat and not threat_hit:
-		threat_hit = true
-		_phase = "aftermath"
-		_controls_locked = true
-		story.say(
-			[
-				"O homem cai antes de ouvir o Mark entrar. Não teve tempo de reagir — nem de avisar os outros.",
-				"Do fundo do corredor, uma voz abafada, presa atrás de uma porta: \"Mark?! MARK?!\" — Sarah, tentando não gritar e falhando.",
-			],
-			["", "Sarah Reyes"]
-		)
+	_phase = "aftermath"
+	_controls_locked = true
+	story.say(
+		[
+			"O último cai. A casa fica num silêncio que não parece a casa dele.",
+			"Do fundo, uma voz abafada, tentando não gritar e falhando: \"Mark?! MARK?!\"",
+		],
+		["", "Sarah Reyes"]
+	)
 
 
 func _check_rescue() -> void:
@@ -302,46 +266,29 @@ func _check_rescue() -> void:
 		)
 
 
-func _process(delta: float) -> void:
-	if not _controls_locked:
-		_move_player()
-		_update_facing(delta)
-	_check_fire()
+func _on_player_downed() -> void:
+	_phase = "down"
+	_controls_locked = true
+	combat.restart_mission()
+
+
+func _process(_delta: float) -> void:
+	player.controls_locked = _controls_locked
+	player.can_shoot = _phase == "fight"
+	fire_btn.visible = _phase == "fight" and not _controls_locked
 	_check_rescue()
-	_update_theo_follow(delta)
 	_update_hud()
 	queue_redraw()
-
-
-func _move_player() -> void:
-	player.velocity = InputBridge.move_vector * SPEED_CAUTIOUS
-	player.move_and_slide()
-
-
-func _update_facing(delta: float) -> void:
-	if InputBridge.aim_touching and InputBridge.aim_vector.length() > 0.15:
-		var target_dir := InputBridge.aim_vector.normalized()
-		var diff := wrapf(target_dir.angle() - _facing.angle(), -PI, PI)
-		var max_step := FACING_TURN_SPEED_AIMING * delta
-		_facing = _facing.rotated(clamp(diff, -max_step, max_step))
-
-
-func _update_theo_follow(delta: float) -> void:
-	if _phase == "intro":
-		return
-	var to_player := player.position - theo_marker.position
-	if to_player.length() > PARTNER_FOLLOW_DIST * 3.0:
-		return # Theo ficou pra trás cobrindo o resto — não teleporta atrás do Mark na extração.
-	if to_player.length() > PARTNER_FOLLOW_DIST:
-		theo_marker.position = theo_marker.position.move_toward(player.position, PARTNER_FOLLOW_SPEED * delta)
 
 
 func _update_hud() -> void:
 	match _phase:
 		"fight":
-			status_label.text = tr("Neutralize a ameaça.")
+			status_label.text = tr("Tire os sequestradores de casa: %d restantes. O do fundo vigia a passagem.") % combat.alive_count() + "   " + tr("Colete: %d/%d") % [player.vest_hp, player.vest_hits]
 		"rescue":
-			status_label.text = tr("Objetivo: chegue até a Sarah e a Emma e liberte elas.")
+			status_label.text = tr("Objetivo: chegue até a Sarah e a Emma e segure LIBERTAR.")
+		"down":
+			status_label.text = tr("Mark foi abatido — recomeçando a missão...")
 		"done":
 			status_label.text = tr("Fase 3 concluída.")
 		_:
@@ -349,28 +296,5 @@ func _update_hud() -> void:
 
 
 func _draw() -> void:
-	if player:
-		draw_circle(player.position, PLAYER_RADIUS, Color(0.3, 0.6, 0.9))
-		if _phase == "fight" and _aim_valid:
-			var line_color := Color(0.3, 1.0, 0.4, 0.8) if _aim_hit_threat else Color(1.0, 1.0, 1.0, 0.35)
-			draw_dashed_line(player.position, _aim_end, line_color, 2.0, 10.0)
-			draw_circle(_aim_end, 5.0, line_color)
-		else:
-			draw_line(player.position, player.position + _facing * (PLAYER_RADIUS + 24.0), Color.WHITE, 3.0)
-
-	if theo_marker and _phase != "rescue" and _phase != "outro" and _phase != "done":
-		draw_circle(theo_marker.position, 15.0, Color(0.2, 0.45, 0.3))
-		_draw_name_tag(theo_marker.position, "Theo")
-
-	if threat:
-		draw_circle(threat.position, 15.0, Color(0.2, 0.2, 0.2) if threat_hit else Color(0.8, 0.2, 0.2))
-
-	if family_obj and threat_hit:
+	if family_obj:
 		draw_circle(family_obj.position, 18.0, Color(0.3, 0.7, 0.4) if _rescued else Color(0.85, 0.75, 0.3))
-
-
-func _draw_name_tag(pos: Vector2, text: String) -> void:
-	var font := ThemeDB.fallback_font
-	var font_size := 13
-	var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
-	draw_string(font, pos - text_size * 0.5 + Vector2(0, -24), text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)

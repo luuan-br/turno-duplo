@@ -60,6 +60,21 @@ func _ready() -> void:
 	continue_btn.pressed.connect(_advance)
 	add_child(continue_btn)
 
+	# Pular a sequência inteira — essencial desde que cair no combate
+	# recomeça a missão do início (diálogo de abertura repetido a cada morte).
+	var skip_btn := Button.new()
+	skip_btn.text = tr("Pular >>")
+	skip_btn.anchor_left = 1.0
+	skip_btn.anchor_right = 1.0
+	skip_btn.anchor_top = 1.0
+	skip_btn.anchor_bottom = 1.0
+	skip_btn.offset_left = -300.0
+	skip_btn.offset_right = -180.0
+	skip_btn.offset_top = -46.0
+	skip_btn.offset_bottom = -10.0
+	skip_btn.pressed.connect(skip)
+	add_child(skip_btn)
+
 	visible = false
 
 
@@ -78,6 +93,14 @@ func say(lines: Array, speakers: Array = []) -> void:
 
 func is_active() -> bool:
 	return visible
+
+
+func skip() -> void:
+	if not visible:
+		return
+	_index = _lines.size()
+	visible = false
+	finished.emit()
 
 
 func _advance() -> void:

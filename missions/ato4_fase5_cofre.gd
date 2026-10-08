@@ -1,22 +1,21 @@
 extends Node2D
 ## Ato 4, Fase 5 — "O Cofre" (docs/ROTEIRO.md). Breach & clear final
-## contra o músculo de apoio de Kessler, seguido de um trecho de fuga
-## atirando enquanto dirige — a **fusão tático+perseguição** que ficava
-## registrada como pendência desde o início do projeto (GDD Seção 8,
-## "Prototipar a fusão tático+perseguição... só existe no papel"). Usa a
-## mesma mira automática criada na Fase 2 (cone, sem apontar manual),
-## só que virada pra TRÁS: aqui não é o jogador caçando, é o jogador
-## sendo caçado por um reforço de Kessler na saída.
+## contra o músculo de apoio de Kessler, com o combate de risco real
+## (`actors/`): três guardas na sala do cofre — um parado vigiando o
+## cofre, dois patrulhando — e mesas de cobertura. Depois, a fuga de carro
+## atirando pra trás (fusão tático+perseguição, mira automática por cone
+## virada pra trás) — esse trecho de carro não mudou, já tinha sido
+## validado no celular.
 
-const ROOM_SIZE := Vector2(460.0, 380.0)
+const ROOM_SIZE := Vector2(560.0, 420.0)
 const ROOM_ORIGIN := Vector2(80.0, 60.0)
 const WALL_THICK := 20.0
-const PLAYER_RADIUS := 14.0
-const SPEED_CAUTIOUS := 90.0
-const FIRE_RANGE := 900.0
+const VEST_HITS := 2
+const WALL_COLOR := Color(0.2, 0.19, 0.16)
+const DESK_COLOR := Color(0.33, 0.29, 0.22)
 
 const TRACK_SIZE := Vector2(820.0, 300.0)
-const TRACK_ORIGIN := Vector2(80.0, 520.0)
+const TRACK_ORIGIN := Vector2(80.0, 540.0)
 const MAX_SPEED := 190.0
 const ACCEL := 220.0
 const BRAKE_DECEL := 400.0
@@ -29,17 +28,10 @@ const PURSUER_DAMAGE_MAX := 2
 const REAR_CONE_RANGE := 220.0
 const REAR_CONE_DOT := 0.9
 
-var player: CharacterBody2D
-var player_camera: Camera2D
-var threat_a: Area2D
-var threat_a_hit := false
-var threat_b: Area2D
-var threat_b_hit := false
+var player: TacticalPlayer
+var combat: CombatLayer
 var vault_obj: Area2D
 var _vault_opened := false
-
-var _facing := Vector2.RIGHT
-const FACING_TURN_SPEED_AIMING := 9.0
 
 var player_car: CharacterBody2D
 var player_speed := 0.0
@@ -51,7 +43,6 @@ var _fire_target_valid := false
 
 var left_stick: Control
 var right_stick: Control
-var breach_btn: Control
 var fire_btn: Control
 var open_btn: Control
 var accel_btn: Control
@@ -62,21 +53,19 @@ var status_label: Label
 var next_btn: Button
 var _controls_locked := true
 var _phase := "intro"
-## intro -> fight_a -> between -> fight_b -> aftermath -> open -> to_car -> escape -> outro -> done
-
-var _aim_end := Vector2.ZERO
-var _aim_hit_threat := false
-var _aim_valid := false
+## intro -> fight -> aftermath -> open -> to_car -> escape -> outro -> done (ou down -> recomeça)
 
 const SCENE_PATH := "res://missions/ato4_fase5_cofre.tscn"
 
 
 func _ready() -> void:
 	_build_room()
-	_build_player()
-	_build_threats()
 	_build_vault()
 	_build_track()
+	combat = CombatLayer.new()
+	add_child(combat)
+	_build_player()
+	_build_guards()
 	_build_hud()
 	_build_controls()
 	_build_story_box()
@@ -84,77 +73,45 @@ func _ready() -> void:
 	story.say(
 		[
 			"A porta do cofre já está entreaberta — Kessler não veio buscar dinheiro, veio buscar tempo. Documentos, servidores, provas.",
-			"Dois homens cobrem a sala principal. Essa é a última barreira antes do que quer que o Kessler esteja levando embora.",
+			"Três homens cobrem a sala. Um deles não sai do lado do cofre. Essa é a última barreira antes do que quer que o Kessler esteja levando embora.",
 		],
 		["", ""]
 	)
+
+
+# ---------- construção da cena ----------
+
+func _add_block(r: Rect2, color: Color) -> void:
+	var body := StaticBody2D.new()
+	var shape := CollisionShape2D.new()
+	var rect_shape := RectangleShape2D.new()
+	rect_shape.size = r.size
+	shape.shape = rect_shape
+	shape.position = r.size * 0.5
+	body.add_child(shape)
+	body.position = r.position
+	add_child(body)
+
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([Vector2.ZERO, Vector2(r.size.x, 0), r.size, Vector2(0, r.size.y)])
+	poly.color = color
+	poly.position = r.position
+	add_child(poly)
 
 
 func _build_room() -> void:
 	var o := ROOM_ORIGIN
 	var w := ROOM_SIZE.x
 	var h := ROOM_SIZE.y
-	var rects: Array[Rect2] = [
-		Rect2(o, Vector2(w, WALL_THICK)),
-		Rect2(Vector2(o.x, o.y + h - WALL_THICK), Vector2(w, WALL_THICK)),
-		Rect2(o, Vector2(WALL_THICK, h)),
-		Rect2(Vector2(o.x + w - WALL_THICK, o.y), Vector2(WALL_THICK, h)),
-	]
-	for r in rects:
-		var body := StaticBody2D.new()
-		var shape := CollisionShape2D.new()
-		var rect_shape := RectangleShape2D.new()
-		rect_shape.size = r.size
-		shape.shape = rect_shape
-		shape.position = r.size * 0.5
-		body.add_child(shape)
-		body.position = r.position
-		add_child(body)
-
-		var poly := Polygon2D.new()
-		poly.polygon = PackedVector2Array([Vector2.ZERO, Vector2(r.size.x, 0), r.size, Vector2(0, r.size.y)])
-		poly.color = Color(0.2, 0.19, 0.16)
-		poly.position = r.position
-		add_child(poly)
-
-
-func _build_player() -> void:
-	player = CharacterBody2D.new()
-	var shape := CollisionShape2D.new()
-	var circle := CircleShape2D.new()
-	circle.radius = PLAYER_RADIUS
-	shape.shape = circle
-	player.add_child(shape)
-	player.position = ROOM_ORIGIN + Vector2(60, ROOM_SIZE.y - 70)
-	add_child(player)
-
-	player_camera = Camera2D.new()
-	player_camera.enabled = true
-	player_camera.position_smoothing_enabled = true
-	player_camera.position_smoothing_speed = 5.0
-	player.add_child(player_camera)
-
-
-func _build_threats() -> void:
-	threat_a = Area2D.new()
-	var s1 := CollisionShape2D.new()
-	var c1 := CircleShape2D.new()
-	c1.radius = 15.0
-	s1.shape = c1
-	threat_a.add_child(s1)
-	threat_a.position = ROOM_ORIGIN + Vector2(ROOM_SIZE.x * 0.3, ROOM_SIZE.y * 0.25)
-	threat_a.monitorable = true
-	add_child(threat_a)
-
-	threat_b = Area2D.new()
-	var s2 := CollisionShape2D.new()
-	var c2 := CircleShape2D.new()
-	c2.radius = 15.0
-	s2.shape = c2
-	threat_b.add_child(s2)
-	threat_b.position = ROOM_ORIGIN + Vector2(ROOM_SIZE.x * 0.75, ROOM_SIZE.y * 0.6)
-	threat_b.monitorable = true
-	add_child(threat_b)
+	_add_block(Rect2(o, Vector2(w, WALL_THICK)), WALL_COLOR)
+	_add_block(Rect2(Vector2(o.x, o.y + h - WALL_THICK), Vector2(w, WALL_THICK)), WALL_COLOR)
+	_add_block(Rect2(o, Vector2(WALL_THICK, h)), WALL_COLOR)
+	_add_block(Rect2(Vector2(o.x + w - WALL_THICK, o.y), Vector2(WALL_THICK, h)), WALL_COLOR)
+	# Mesas de escritório: cobertura pra avançar da entrada (canto de baixo
+	# à esquerda) até o cofre (canto de cima à direita).
+	_add_block(Rect2(o + Vector2(150, 120), Vector2(80, 30)), DESK_COLOR)
+	_add_block(Rect2(o + Vector2(300, 250), Vector2(30, 90)), DESK_COLOR)
+	_add_block(Rect2(o + Vector2(140, 300), Vector2(60, 30)), DESK_COLOR)
 
 
 func _build_vault() -> void:
@@ -164,7 +121,7 @@ func _build_vault() -> void:
 	circle.radius = 20.0
 	shape.shape = circle
 	vault_obj.add_child(shape)
-	vault_obj.position = ROOM_ORIGIN + Vector2(ROOM_SIZE.x - 80, ROOM_SIZE.y - 100)
+	vault_obj.position = ROOM_ORIGIN + Vector2(ROOM_SIZE.x - 80, 80)
 	vault_obj.monitorable = true
 	add_child(vault_obj)
 
@@ -173,32 +130,35 @@ func _build_track() -> void:
 	var top := TRACK_ORIGIN
 	var w := TRACK_SIZE.x
 	var h := TRACK_SIZE.y
-	var rects: Array[Rect2] = [
-		Rect2(top, Vector2(w, WALL_THICK)),
-		Rect2(Vector2(top.x, top.y + h - WALL_THICK), Vector2(w, WALL_THICK)),
-		Rect2(top, Vector2(WALL_THICK, h)),
-		Rect2(Vector2(top.x + w - WALL_THICK, top.y), Vector2(WALL_THICK, h)),
-	]
-	for r in rects:
-		var body := StaticBody2D.new()
-		var shape := CollisionShape2D.new()
-		var rect_shape := RectangleShape2D.new()
-		rect_shape.size = r.size
-		shape.shape = rect_shape
-		shape.position = r.size * 0.5
-		body.add_child(shape)
-		body.position = r.position
-		add_child(body)
-
-		var poly := Polygon2D.new()
-		poly.polygon = PackedVector2Array([Vector2.ZERO, Vector2(r.size.x, 0), r.size, Vector2(0, r.size.y)])
-		poly.color = Color(0.14, 0.14, 0.18)
-		poly.position = r.position
-		add_child(poly)
+	var wall := Color(0.14, 0.14, 0.18)
+	_add_block(Rect2(top, Vector2(w, WALL_THICK)), wall)
+	_add_block(Rect2(Vector2(top.x, top.y + h - WALL_THICK), Vector2(w, WALL_THICK)), wall)
+	_add_block(Rect2(top, Vector2(WALL_THICK, h)), wall)
+	_add_block(Rect2(Vector2(top.x + w - WALL_THICK, top.y), Vector2(WALL_THICK, h)), wall)
 
 	escape_finish = Node2D.new()
 	escape_finish.position = top + Vector2(w - 70, h * 0.5)
 	add_child(escape_finish)
+
+
+func _build_player() -> void:
+	player = TacticalPlayer.new()
+	player.position = ROOM_ORIGIN + Vector2(60, ROOM_SIZE.y - 70)
+	player.set_vest(VEST_HITS)
+	player.extra_exclude = [vault_obj.get_rid()]
+	add_child(player)
+	combat.setup(player)
+	combat.player_downed.connect(_on_player_downed)
+	combat.all_guards_down.connect(_on_all_guards_down)
+
+
+func _build_guards() -> void:
+	var o := ROOM_ORIGIN
+	var w := ROOM_SIZE.x
+	var h := ROOM_SIZE.y
+	combat.add_guard([o + Vector2(w - 140, 120)], Vector2(-1.0, 0.6))
+	combat.add_guard([o + Vector2(200, 230), o + Vector2(420, 230)])
+	combat.add_guard([o + Vector2(w - 60, 200), o + Vector2(w - 60, h - 60)])
 
 
 func _build_hud() -> void:
@@ -249,16 +209,12 @@ func _build_controls() -> void:
 	right_stick = Control.new()
 	right_stick.set_script(load("res://ui/virtual_joystick.gd"))
 	right_stick.right_stick = true
+	right_stick.double_tap_action = "shoot"
 	right_stick.anchor_left = 0.5
 	right_stick.anchor_right = 1.0
 	right_stick.anchor_top = 0.0
 	right_stick.anchor_bottom = 1.0
 	layer.add_child(right_stick)
-
-	breach_btn = _corner_button("breach", tr("ARROMBAR"), 30.0, 180.0, 100.0, 100.0)
-	breach_btn.show_hold_progress = true
-	breach_btn.visible = false
-	layer.add_child(breach_btn)
 
 	fire_btn = _corner_button("shoot", tr("ATIRAR"), 30.0, 180.0, 100.0, 100.0)
 	fire_btn.visible = false
@@ -307,14 +263,14 @@ func _build_story_box() -> void:
 	story.finished.connect(_on_story_finished)
 
 
+# ---------- fluxo ----------
+
 func _on_story_finished() -> void:
 	match _phase:
 		"intro":
-			_phase = "fight_a"
+			_phase = "fight"
 			_controls_locked = false
-		"between":
-			_phase = "fight_b"
-			_controls_locked = false
+			combat.set_active(true)
 		"aftermath":
 			_phase = "open"
 			_controls_locked = false
@@ -326,47 +282,24 @@ func _on_story_finished() -> void:
 			next_btn.visible = true
 
 
-func _check_fire() -> void:
-	if _phase != "fight_a" and _phase != "fight_b":
-		fire_btn.visible = false
+func _on_all_guards_down() -> void:
+	if _phase != "fight":
 		return
-	fire_btn.visible = true
+	_phase = "aftermath"
+	_controls_locked = true
+	story.say(
+		[
+			"A sala fica quieta. Mas o cofre de verdade, o de dados e documentos, continua trancado.",
+			"É agora ou nunca — Kessler não vai deixar essa prova esperando muito mais.",
+		],
+		["", ""]
+	)
 
-	var active_threat: Area2D = threat_a if _phase == "fight_a" else threat_b
 
-	var space_state := get_world_2d().direct_space_state
-	var start := player.position + _facing * (PLAYER_RADIUS + 2.0)
-	var query := PhysicsRayQueryParameters2D.create(start, start + _facing * FIRE_RANGE)
-	query.collide_with_areas = true
-	query.collide_with_bodies = true
-	query.exclude = [player.get_rid()]
-	var result := space_state.intersect_ray(query)
-
-	_aim_valid = true
-	if result.is_empty():
-		_aim_end = start + _facing * FIRE_RANGE
-		_aim_hit_threat = false
-	else:
-		_aim_end = result.position
-		_aim_hit_threat = result.collider == active_threat
-
-	if InputBridge.consume_just_pressed("shoot") and not result.is_empty() and result.collider == active_threat:
-		if _phase == "fight_a":
-			threat_a_hit = true
-			_phase = "between"
-			_controls_locked = true
-			story.say(["Um cai. O outro vira a arma rápido demais — não dá tempo de respirar."], [""])
-		else:
-			threat_b_hit = true
-			_phase = "aftermath"
-			_controls_locked = true
-			story.say(
-				[
-					"A sala principal está livre. Mas o cofre de verdade, o de dados e documentos, continua trancado.",
-					"É agora ou nunca — Kessler não vai deixar essa prova esperando muito mais.",
-				],
-				["", ""]
-			)
+func _on_player_downed() -> void:
+	_phase = "down"
+	_controls_locked = true
+	combat.restart_mission()
 
 
 func _check_vault() -> void:
@@ -393,10 +326,9 @@ func _check_vault() -> void:
 
 
 func _process(delta: float) -> void:
-	if not _controls_locked and (_phase == "fight_a" or _phase == "fight_b" or _phase == "open"):
-		_move_player()
-		_update_facing(delta)
-	_check_fire()
+	player.controls_locked = _controls_locked or player_car != null
+	player.can_shoot = _phase == "fight"
+	fire_btn.visible = _phase == "fight" and not _controls_locked
 	_check_vault()
 
 	if _phase == "escape":
@@ -409,19 +341,6 @@ func _process(delta: float) -> void:
 
 	_update_hud()
 	queue_redraw()
-
-
-func _move_player() -> void:
-	player.velocity = InputBridge.move_vector * SPEED_CAUTIOUS
-	player.move_and_slide()
-
-
-func _update_facing(delta: float) -> void:
-	if InputBridge.aim_touching and InputBridge.aim_vector.length() > 0.15:
-		var target_dir := InputBridge.aim_vector.normalized()
-		var diff := wrapf(target_dir.angle() - _facing.angle(), -PI, PI)
-		var max_step := FACING_TURN_SPEED_AIMING * delta
-		_facing = _facing.rotated(clamp(diff, -max_step, max_step))
 
 
 # ---------- trecho de fuga de carro ----------
@@ -442,7 +361,8 @@ func _spawn_cars() -> void:
 	# duas Camera2D com enabled=true ao mesmo tempo nem sempre trocam
 	# sozinhas de forma confiável (bug relatado: câmera ficava presa no
 	# player tático durante a fuga).
-	player_camera.enabled = false
+	player.camera.enabled = false
+	player.visible = false
 
 	var camera := Camera2D.new()
 	camera.enabled = true
@@ -456,10 +376,9 @@ func _spawn_cars() -> void:
 	rect2.size = Vector2(28, 16)
 	shape2.shape = rect2
 	pursuer_car.add_child(shape2)
-	# Dentro da pista, atrás do carro do jogador — a posição anterior
-	# (TRACK_ORIGIN.x - 20) caía do lado de fora da parede esquerda
-	# (parede ocupa até TRACK_ORIGIN.x + WALL_THICK), deixando o
-	# perseguidor preso fora do cenário.
+	# Dentro da pista, atrás do carro do jogador — fora da parede esquerda
+	# (parede ocupa até TRACK_ORIGIN.x + WALL_THICK) ele ficava preso fora
+	# do cenário.
 	pursuer_car.position = TRACK_ORIGIN + Vector2(WALL_THICK + 25.0, TRACK_SIZE.y * 0.5)
 	add_child(pursuer_car)
 
@@ -468,10 +387,8 @@ func _update_drive_buttons() -> void:
 	var escaping := _phase == "escape" and not _controls_locked
 	accel_btn.visible = escaping
 	brake_btn.visible = escaping
-	# O manche direito (mira manual) fica embaixo do mesmo canto onde os
-	# botões de carro aparecem — escondido durante a fuga pra não disputar
-	# toque com ACELERAR/FREAR/ATIRAR PRA TRÁS (mesmo bug de sobreposição
-	# já corrigido antes no tático, ver CLAUDE.md).
+	# O manche direito fica embaixo do mesmo canto dos botões de carro —
+	# escondido na fuga pra não disputar toque com ACELERAR/FREAR/ATIRAR.
 	right_stick.visible = not escaping
 	if not player_car:
 		_spawn_cars()
@@ -506,7 +423,7 @@ func _drive_player(delta: float) -> void:
 	player_car.move_and_slide()
 
 
-func _drive_pursuer(delta: float) -> void:
+func _drive_pursuer(_delta: float) -> void:
 	if not pursuer_car or pursuer_defeated or not player_car:
 		return
 	var to_player := player_car.position - pursuer_car.position
@@ -566,12 +483,14 @@ func _check_escape_finish() -> void:
 
 func _update_hud() -> void:
 	match _phase:
-		"fight_a", "fight_b":
-			status_label.text = tr("Neutralize a ameaça.")
+		"fight":
+			status_label.text = tr("Limpe a sala do cofre: %d guardas restantes. Avance de mesa em mesa.") % combat.alive_count() + "   " + tr("Colete: %d/%d") % [player.vest_hp, player.vest_hits]
 		"open":
-			status_label.text = tr("Objetivo: chegue no cofre e abra.")
+			status_label.text = tr("Objetivo: chegue no cofre e segure ABRIR COFRE.")
 		"escape":
 			status_label.text = tr("Fuja! Alinhe o carro e ATIRE PRA TRÁS pra deter o perseguidor.")
+		"down":
+			status_label.text = tr("Mark foi abatido — recomeçando a missão...")
 		"done":
 			status_label.text = tr("Fase 5 concluída.")
 		_:
@@ -579,20 +498,7 @@ func _update_hud() -> void:
 
 
 func _draw() -> void:
-	if _phase in ["fight_a", "fight_b", "open"] and player:
-		draw_circle(player.position, PLAYER_RADIUS, Color(0.3, 0.6, 0.9))
-		if (_phase == "fight_a" or _phase == "fight_b") and _aim_valid:
-			var line_color := Color(0.3, 1.0, 0.4, 0.8) if _aim_hit_threat else Color(1.0, 1.0, 1.0, 0.35)
-			draw_dashed_line(player.position, _aim_end, line_color, 2.0, 10.0)
-			draw_circle(_aim_end, 5.0, line_color)
-		else:
-			draw_line(player.position, player.position + _facing * (PLAYER_RADIUS + 24.0), Color.WHITE, 3.0)
-
-	if threat_a:
-		draw_circle(threat_a.position, 15.0, Color(0.2, 0.2, 0.2) if threat_a_hit else Color(0.8, 0.2, 0.2))
-	if threat_b and threat_a_hit:
-		draw_circle(threat_b.position, 15.0, Color(0.2, 0.2, 0.2) if threat_b_hit else Color(0.8, 0.2, 0.2))
-	if vault_obj and threat_b_hit:
+	if vault_obj:
 		draw_circle(vault_obj.position, 20.0, Color(0.3, 0.7, 0.4) if _vault_opened else Color(0.85, 0.7, 0.2))
 
 	if player_car:
