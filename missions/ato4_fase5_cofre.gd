@@ -4,8 +4,9 @@ extends Node2D
 ## (`actors/`): três guardas na sala do cofre — um parado vigiando o
 ## cofre, dois patrulhando — e mesas de cobertura. Depois, a fuga de carro
 ## atirando pra trás (fusão tático+perseguição, mira automática por cone
-## virada pra trás) — esse trecho de carro não mudou, já tinha sido
-## validado no celular.
+## virada pra trás), agora com risco real (`actors/`): pista longa em
+## zigue-zague, dois carros de reforço atrás — um tenta bater, o outro tem
+## atirador — e lataria. Carro destruído = a missão recomeça do início.
 
 const ROOM_SIZE := Vector2(560.0, 420.0)
 const ROOM_ORIGIN := Vector2(80.0, 60.0)
@@ -14,32 +15,21 @@ const VEST_HITS := 2
 const WALL_COLOR := Color(0.2, 0.19, 0.16)
 const DESK_COLOR := Color(0.33, 0.29, 0.22)
 
-const TRACK_SIZE := Vector2(820.0, 300.0)
+const TRACK_SIZE := Vector2(1600.0, 300.0)
 const TRACK_ORIGIN := Vector2(80.0, 540.0)
-const MAX_SPEED := 190.0
-const ACCEL := 220.0
-const BRAKE_DECEL := 400.0
-const REVERSE_SPEED := 90.0
-const COAST_DECEL := 90.0
-const TURN_RATE := 2.6
-const STEER_DEADZONE := 0.2
-const PURSUER_SPEED := 150.0
-const PURSUER_DAMAGE_MAX := 2
-const REAR_CONE_RANGE := 220.0
-const REAR_CONE_DOT := 0.9
+const TRACK_WALL_COLOR := Color(0.14, 0.14, 0.18)
+const BARRIER_COLOR := Color(0.45, 0.35, 0.15)
+const REAR_SHOT_DAMAGE := 1.0
+const PURSUIT_HEAD_START := 1.2
 
 var player: TacticalPlayer
 var combat: CombatLayer
 var vault_obj: Area2D
 var _vault_opened := false
 
-var player_car: CharacterBody2D
-var player_speed := 0.0
-var pursuer_car: CharacterBody2D
-var pursuer_damage := 0
-var pursuer_defeated := false
+var car: PlayerCar
+var chase: ChaseLayer
 var escape_finish: Node2D
-var _fire_target_valid := false
 
 var left_stick: Control
 var right_stick: Control
@@ -62,6 +52,8 @@ func _ready() -> void:
 	_build_room()
 	_build_vault()
 	_build_track()
+	chase = ChaseLayer.new()
+	add_child(chase)
 	combat = CombatLayer.new()
 	add_child(combat)
 	_build_player()
@@ -130,11 +122,18 @@ func _build_track() -> void:
 	var top := TRACK_ORIGIN
 	var w := TRACK_SIZE.x
 	var h := TRACK_SIZE.y
-	var wall := Color(0.14, 0.14, 0.18)
-	_add_block(Rect2(top, Vector2(w, WALL_THICK)), wall)
-	_add_block(Rect2(Vector2(top.x, top.y + h - WALL_THICK), Vector2(w, WALL_THICK)), wall)
-	_add_block(Rect2(top, Vector2(WALL_THICK, h)), wall)
-	_add_block(Rect2(Vector2(top.x + w - WALL_THICK, top.y), Vector2(WALL_THICK, h)), wall)
+	_add_block(Rect2(top, Vector2(w, WALL_THICK)), TRACK_WALL_COLOR)
+	_add_block(Rect2(Vector2(top.x, top.y + h - WALL_THICK), Vector2(w, WALL_THICK)), TRACK_WALL_COLOR)
+	_add_block(Rect2(top, Vector2(WALL_THICK, h)), TRACK_WALL_COLOR)
+	_add_block(Rect2(Vector2(top.x + w - WALL_THICK, top.y), Vector2(WALL_THICK, h)), TRACK_WALL_COLOR)
+	# Barreiras alternando em cima/embaixo: obriga zigue-zague (e frear),
+	# que é quando os carros de trás encostam.
+	var inner_h := h - WALL_THICK * 2.0
+	var barrier_h := inner_h * 0.65
+	for i in 4:
+		var x := top.x + 380.0 + i * 300.0
+		var y := top.y + WALL_THICK if i % 2 == 0 else top.y + h - WALL_THICK - barrier_h
+		_add_block(Rect2(Vector2(x, y), Vector2(40, barrier_h)), BARRIER_COLOR)
 
 	escape_finish = Node2D.new()
 	escape_finish.position = top + Vector2(w - 70, h * 0.5)
@@ -325,18 +324,25 @@ func _check_vault() -> void:
 		)
 
 
-func _process(delta: float) -> void:
-	player.controls_locked = _controls_locked or player_car != null
+func _process(_delta: float) -> void:
+	player.controls_locked = _controls_locked or car != null
 	player.can_shoot = _phase == "fight"
 	fire_btn.visible = _phase == "fight" and not _controls_locked
 	_check_vault()
 
-	if _phase == "escape":
-		_update_drive_buttons()
-		if not _controls_locked:
-			_drive_player(delta)
-		_drive_pursuer(delta)
-		_check_rear_fire()
+	if _phase == "escape" and car == null:
+		_spawn_cars()
+	if car != null:
+		var escaping := _phase == "escape" and not _controls_locked
+		car.controls_locked = not escaping
+		accel_btn.visible = escaping
+		brake_btn.visible = escaping
+		# O manche direito fica embaixo do mesmo canto dos botões de carro —
+		# escondido na fuga pra não disputar toque com ACELERAR/FREAR/ATIRAR.
+		right_stick.visible = not escaping
+		rear_fire_btn.visible = escaping and chase.auto_target != null
+		if escaping and InputBridge.consume_just_pressed("rear_shoot"):
+			chase.fire_auto(REAR_SHOT_DAMAGE)
 		_check_escape_finish()
 
 	_update_hud()
@@ -346,17 +352,6 @@ func _process(delta: float) -> void:
 # ---------- trecho de fuga de carro ----------
 
 func _spawn_cars() -> void:
-	if player_car:
-		return
-	player_car = CharacterBody2D.new()
-	var shape := CollisionShape2D.new()
-	var rect := RectangleShape2D.new()
-	rect.size = Vector2(28, 16)
-	shape.shape = rect
-	player_car.add_child(shape)
-	player_car.position = TRACK_ORIGIN + Vector2(60, TRACK_SIZE.y * 0.5)
-	add_child(player_car)
-
 	# Desativa a câmera tática explicitamente antes de ligar a do carro —
 	# duas Camera2D com enabled=true ao mesmo tempo nem sempre trocam
 	# sozinhas de forma confiável (bug relatado: câmera ficava presa no
@@ -364,108 +359,64 @@ func _spawn_cars() -> void:
 	player.camera.enabled = false
 	player.visible = false
 
-	var camera := Camera2D.new()
-	camera.enabled = true
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 5.0
-	player_car.add_child(camera)
+	car = PlayerCar.new()
+	car.position = TRACK_ORIGIN + Vector2(160, TRACK_SIZE.y * 0.5)
+	car.max_speed = 190.0
+	add_child(car)
+	chase.setup(car)
+	chase.aim_mode = -1
+	chase.ram_damage = 1.0
+	chase.player_wrecked.connect(_on_car_wrecked)
 
-	pursuer_car = CharacterBody2D.new()
-	var shape2 := CollisionShape2D.new()
-	var rect2 := RectangleShape2D.new()
-	rect2.size = Vector2(28, 16)
-	shape2.shape = rect2
-	pursuer_car.add_child(shape2)
-	# Dentro da pista, atrás do carro do jogador — fora da parede esquerda
-	# (parede ocupa até TRACK_ORIGIN.x + WALL_THICK) ele ficava preso fora
-	# do cenário.
-	pursuer_car.position = TRACK_ORIGIN + Vector2(WALL_THICK + 25.0, TRACK_SIZE.y * 0.5)
-	add_child(pursuer_car)
+	# Reforços nascem dentro da pista, atrás do jogador (fora da parede
+	# esquerda eles ficavam presos do lado de fora do cenário).
+	var rammer := EnemyCar.new()
+	rammer.mode = EnemyCar.Mode.PURSUE
+	rammer.position = TRACK_ORIGIN + Vector2(WALL_THICK + 25.0, TRACK_SIZE.y * 0.3)
+	rammer.speed = 160.0
+	rammer.max_hp = 2.0
+	rammer.body_color = Color(0.45, 0.1, 0.1)
+	chase.add_enemy(rammer)
+
+	var gunner := EnemyCar.new()
+	gunner.mode = EnemyCar.Mode.PURSUE
+	gunner.position = TRACK_ORIGIN + Vector2(WALL_THICK + 25.0, TRACK_SIZE.y * 0.7)
+	gunner.speed = 135.0
+	gunner.max_hp = 2.0
+	gunner.shooter = true
+	gunner.shot_damage = 20.0
+	gunner.body_color = Color(0.15, 0.15, 0.15)
+	chase.add_enemy(gunner)
+
+	# Um instante de vantagem antes dos reforços largarem.
+	get_tree().create_timer(PURSUIT_HEAD_START).timeout.connect(_start_pursuit)
 
 
-func _update_drive_buttons() -> void:
-	var escaping := _phase == "escape" and not _controls_locked
-	accel_btn.visible = escaping
-	brake_btn.visible = escaping
-	# O manche direito fica embaixo do mesmo canto dos botões de carro —
-	# escondido na fuga pra não disputar toque com ACELERAR/FREAR/ATIRAR.
-	right_stick.visible = not escaping
-	if not player_car:
-		_spawn_cars()
+func _start_pursuit() -> void:
+	if _phase == "escape":
+		chase.set_active(true)
 
 
-func _drive_player(delta: float) -> void:
-	if not player_car:
+func _on_car_wrecked() -> void:
+	if _phase != "escape":
 		return
-	var accelerating := InputBridge.is_held("accelerate")
-	var braking := InputBridge.is_held("brake")
-
-	if accelerating and not braking:
-		player_speed = move_toward(player_speed, MAX_SPEED, ACCEL * delta)
-	elif braking:
-		if player_speed > 0.0:
-			player_speed = move_toward(player_speed, 0.0, BRAKE_DECEL * delta)
-		else:
-			player_speed = move_toward(player_speed, -REVERSE_SPEED, ACCEL * delta)
-	else:
-		player_speed = move_toward(player_speed, 0.0, COAST_DECEL * delta)
-
-	player_speed = clamp(player_speed, -REVERSE_SPEED, MAX_SPEED)
-
-	if InputBridge.move_vector.length() >= STEER_DEADZONE and absf(player_speed) > 5.0:
-		var desired_angle := InputBridge.move_vector.angle()
-		var diff := wrapf(desired_angle - player_car.rotation, -PI, PI)
-		var speed_factor: float = clamp(absf(player_speed) / MAX_SPEED, 0.35, 1.0)
-		var max_step: float = TURN_RATE * speed_factor * delta
-		player_car.rotation += clamp(diff, -max_step, max_step)
-
-	player_car.velocity = Vector2.RIGHT.rotated(player_car.rotation) * player_speed
-	player_car.move_and_slide()
-
-
-func _drive_pursuer(_delta: float) -> void:
-	if not pursuer_car or pursuer_defeated or not player_car:
-		return
-	var to_player := player_car.position - pursuer_car.position
-	pursuer_car.rotation = to_player.angle()
-	pursuer_car.velocity = to_player.normalized() * PURSUER_SPEED
-	pursuer_car.move_and_slide()
-
-
-func _check_rear_fire() -> void:
-	if pursuer_defeated or not player_car or not pursuer_car:
-		rear_fire_btn.visible = false
-		return
-
-	var rear_facing := -Vector2.RIGHT.rotated(player_car.rotation)
-	var to_pursuer := pursuer_car.position - player_car.position
-	var dist := to_pursuer.length()
-	var dot := rear_facing.dot(to_pursuer.normalized()) if dist > 0.01 else 0.0
-
-	_fire_target_valid = dist <= REAR_CONE_RANGE and dot >= REAR_CONE_DOT
-	rear_fire_btn.visible = _fire_target_valid
-
-	if _fire_target_valid and InputBridge.consume_just_pressed("rear_shoot"):
-		pursuer_damage += 1
-		if pursuer_damage >= PURSUER_DAMAGE_MAX:
-			pursuer_defeated = true
-			rear_fire_btn.visible = false
+	_phase = "down"
+	_controls_locked = true
+	chase.restart_mission()
 
 
 func _check_escape_finish() -> void:
-	if _phase != "escape" or not player_car:
+	if _phase != "escape":
 		return
-	if player_car.position.distance_to(escape_finish.position) < 50.0:
+	if car.global_position.distance_to(escape_finish.position) < 50.0:
 		_phase = "outro"
 		_controls_locked = true
-		accel_btn.visible = false
-		brake_btn.visible = false
-		rear_fire_btn.visible = false
-		if pursuer_defeated:
+		chase.set_active(false)
+		if chase.active_count() == 0:
 			story.say(
 				[
-					"O carro atrás perde o controle e bate na mureta — um obstáculo a menos entre o Mark e o que vem a seguir.",
-					"Theo, ofegante, bate na lateral do carro: \"Prova em mãos, perseguidor fora. Falta só o Kessler.\"",
+					"Os dois carros de trás ficam pelo caminho — um na mureta, outro rodando no meio da pista.",
+					"Theo, ofegante, bate na lateral do carro: \"Prova em mãos, reforço fora. Falta só o Kessler.\"",
 					"Fim da Fase 5 — O Cofre.",
 				],
 				["", "Theo Marsh", ""]
@@ -473,7 +424,7 @@ func _check_escape_finish() -> void:
 		else:
 			story.say(
 				[
-					"O carro atrás desiste perto da saída do Cais — reforço demais visível na área, nem Kessler arriscaria tanto por um motorista a menos.",
+					"Os carros de trás desistem perto da saída do Cais — viatura demais chegando, nem Kessler arriscaria tanto por uma pasta a menos.",
 					"Theo, ofegante: \"A gente tirou a prova. Falta só o Kessler agora.\"",
 					"Fim da Fase 5 — O Cofre.",
 				],
@@ -488,9 +439,12 @@ func _update_hud() -> void:
 		"open":
 			status_label.text = tr("Objetivo: chegue no cofre e segure ABRIR COFRE.")
 		"escape":
-			status_label.text = tr("Fuja! Alinhe o carro e ATIRE PRA TRÁS pra deter o perseguidor.")
+			status_label.text = tr("Fuja até a saída! Alinhe e ATIRE PRA TRÁS. Frear de repente faz quem vem atrás bater.") + "\n" + tr("Lataria: %d%%") % int(car.hp) + "   " + tr("Reforços: %d") % chase.active_count()
 		"down":
-			status_label.text = tr("Mark foi abatido — recomeçando a missão...")
+			if car != null:
+				status_label.text = tr("O carro não aguentou mais — recomeçando a missão...")
+			else:
+				status_label.text = tr("Mark foi abatido — recomeçando a missão...")
 		"done":
 			status_label.text = tr("Fase 5 concluída.")
 		_:
@@ -500,25 +454,5 @@ func _update_hud() -> void:
 func _draw() -> void:
 	if vault_obj:
 		draw_circle(vault_obj.position, 20.0, Color(0.3, 0.7, 0.4) if _vault_opened else Color(0.85, 0.7, 0.2))
-
-	if player_car:
-		_draw_car(player_car.position, player_car.rotation, Color(0.3, 0.6, 0.9))
-		if _phase == "escape" and _fire_target_valid:
-			var rear_facing := -Vector2.RIGHT.rotated(player_car.rotation)
-			draw_dashed_line(player_car.position, player_car.position + rear_facing * REAR_CONE_RANGE, Color(1.0, 0.3, 0.3, 0.6), 2.0, 8.0)
-	if pursuer_car and not pursuer_defeated:
-		_draw_car(pursuer_car.position, pursuer_car.rotation, Color(0.15, 0.15, 0.15))
 	if escape_finish:
 		draw_circle(escape_finish.position, 16.0, Color(0.3, 0.8, 0.4, 0.4))
-
-
-func _draw_car(pos: Vector2, rot: float, color: Color) -> void:
-	var half := Vector2(14, 8)
-	var points := PackedVector2Array([
-		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
-		Vector2(half.x, half.y), Vector2(-half.x, half.y)
-	])
-	for i in points.size():
-		points[i] = pos + points[i].rotated(rot)
-	draw_colored_polygon(points, color)
-	draw_line(pos, pos + Vector2.RIGHT.rotated(rot) * 20.0, Color.WHITE, 2.0)

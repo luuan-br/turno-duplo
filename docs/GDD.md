@@ -212,7 +212,17 @@ O usuário jogou o Ato 4 inteiro e deu o feedback: "tudo parece simples demais, 
 - **Aviso antes do tiro**: o guarda mostra a linha de mira por ~0,7s antes de atirar. Com tiro letal, isso é o que torna a morte justa — o jogador tem tempo de sair da linha ou voltar pra cobertura.
 - **Mira mais solta e toque duplo pra atirar**: o giro da mira passou de taxa fixa (que deixava giro grande lento — "travado") pra suavização exponencial; tocar duas vezes no manche direito atira, além do botão ATIRAR. Por enquanto só ligado no sandbox (`double_tap_action` no manche), até ser aprovado.
 
-Piloto aprovado no celular ("ficou muito bom") e espalhado pras missões de combate (ver "Onde já está aplicado" acima), usando os componentes compartilhados `actors/tactical_player.gd`, `actors/enemy_guard.gd` e `actors/combat_layer.gd`. Próximo alvo do mesmo problema ("simples demais"): as perseguições — o carro inimigo só foge, nunca ameaça.
+Piloto aprovado no celular ("ficou muito bom") e espalhado pras missões de combate (ver "Onde já está aplicado" acima), usando os componentes compartilhados `actors/tactical_player.gd`, `actors/enemy_guard.gd` e `actors/combat_layer.gd`.
+
+### Risco real nas perseguições
+Mesmo diagnóstico do combate a pé: o carro inimigo só dava voltas, nunca escapava, nunca ameaçava, e o carro do jogador era indestrutível. Mesmas regras de consequência do combate (cair = recomeça a missão do início):
+- **Lataria**: batida forte (pela velocidade relativa contra o que foi atingido) machuca o carro e corta a velocidade; raspão e encostar devagar não machucam. Uma batida de frente a toda velocidade tira ~25%. **Carro destruído = missão recomeça.**
+- **O suspeito escapa**: longe demais (~380px) por tempo demais (~4s) e ele some — a missão recomeça. Uma barra "Fugindo" mostra o quanto falta. Substitui a perseguição infinita em círculo.
+- **Inimigo que ameaça, só onde a história pede**: Ato 2 é um motorista em pânico — nada de tiro, o risco é lataria, obstáculos e fuga. No Ato 4 o carro do Ghost tem um **passageiro que atira** (com a mesma linha de mira visível antes do tiro dos guardas — dá pra quebrar a linha atrás de contêiner) e o Ghost dá **freada brusca** quando o jogador cola atrás. Na fuga do Cofre, dois reforços: um **tenta bater** (e recua depois de cada batida, pra não ficar grudado), outro **atira**.
+- **Pistas com obstáculo**: quarteirão/pátio no meio (não dá pra cortar caminho), postes nas curvas, carros estacionados, barreiras em zigue-zague na fuga do Cofre.
+- **Formas de encerrar** continuam as já definidas: PIT (Ato 2), bater até quebrar e atirar no pneu (Ato 4); na fuga, atirar pra trás ou fazer quem vem atrás bater.
+- **Onde está aplicado:** Ato 2 Turno 4, Ato 4 Fases 2 e 5 (fuga). A Direção Defensiva da Academia (Ato 1 Fase 3) fica sem risco — é treino.
+- Componentes: `actors/player_car.gd`, `actors/enemy_car.gd`, `actors/chase_layer.gd`; o `sandbox/perseguicao.gd` é a referência viva com tudo ligado.
 
 ### Pendência: layout de controles configurável
 Ideia do usuário, ainda não implementada no protótipo (é um sistema à parte — editor de posição + salvar preferência — e não faz sentido misturar com validar o "feel" das mecânicas, que é o objetivo do protótipo atual): no jogo final, o jogador deve poder **reposicionar manches e botões onde achar melhor**, com uma disposição padrão definida por nós (a da Seção 8 acima) já pronta de fábrica. Fica pra quando o projeto sair da fase de sandbox pra UI de configurações de verdade.

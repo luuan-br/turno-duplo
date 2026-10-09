@@ -138,7 +138,7 @@ func _build_gate() -> void:
 	gate_body.add_child(shape)
 	var gap := YARD_ORIGIN.y + YARD_SIZE.y * 0.5 - GATE_GAP * 0.5
 	gate_body.position = Vector2(YARD_ORIGIN.x + YARD_SIZE.x - WALL_THICK * 0.5, gap + GATE_GAP * 0.5)
-	gate_body.set_collision_layer_value(1, false)
+	# Sólido até arrombar — antes dava pra atravessar o portão fechado.
 	add_child(gate_body)
 	_theo_hold_pos = gate_body.position + Vector2(-50, 40)
 
@@ -266,6 +266,7 @@ func _update_gate() -> void:
 		return
 	if InputBridge.consume_just_released("breach"):
 		gate_open = true
+		gate_body.set_collision_layer_value(1, false)
 		_theo_holding = true
 		_phase = "breach"
 		_controls_locked = true
@@ -351,6 +352,8 @@ func _draw() -> void:
 		draw_circle(theo_marker.position, 15.0, Color(0.2, 0.45, 0.3))
 		_draw_name_tag(theo_marker.position, "Theo")
 	if gate_body:
+		if not gate_open:
+			draw_rect(Rect2(gate_body.position - Vector2(WALL_THICK, GATE_GAP) * 0.5, Vector2(WALL_THICK, GATE_GAP)), Color(0.45, 0.2, 0.15))
 		draw_circle(gate_body.position, 8.0, Color.GREEN if gate_open else Color(0.7, 0.15, 0.15))
 
 

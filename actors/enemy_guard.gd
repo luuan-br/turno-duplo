@@ -52,6 +52,9 @@ var _spawn_facing := Vector2.RIGHT
 func _ready() -> void:
 	add_to_group("enemies")
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
+	# Pausado (esperando o combate começar) continua sólido e visível pro
+	# raio — o padrão do Godot tiraria o guarda da física.
+	disable_mode = CollisionObject2D.DISABLE_MODE_KEEP_ACTIVE
 	_shape = CollisionShape2D.new()
 	var circle := CircleShape2D.new()
 	circle.radius = RADIUS

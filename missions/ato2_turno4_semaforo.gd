@@ -1,51 +1,31 @@
 extends Node2D
 ## Ato 2, Turno 4 — "Semáforo Cego" (docs/ROTEIRO.md). Falha "isolada" de
 ## semáforo causa um acidente que vira perseguição de carro — primeiro
-## PIT maneuver de verdade (fora do treino sem risco da Fase 3). No caos,
-## um motorista sem rosto escapa com facilidade suspeita — a primeira
-## aparição do Wade "Ghost" Calloway, ainda sem nome (GDD Seção 10):
-## tratado como um beat narrado/visual rápido, não uma segunda perseguição
-## de verdade, pra não duplicar a mecânica principal do turno.
+## PIT de verdade, fora do treino. No caos, um motorista sem rosto escapa
+## com facilidade suspeita — a primeira aparição do Wade "Ghost" Calloway,
+## ainda sem nome (beat visual rápido, não uma segunda perseguição).
 ##
-## Reaproveita a física de direção/PIT por contato já validada na Fase 3
-## (`missions/ato1_fase3_direcao.gd`) — 3ª cópia desse controlador de
-## carro, agora sim bate a "regra dos três" (ver CLAUDE.md): se uma 4ª
-## aparecer, vale extrair um componente compartilhado.
+## Risco real nas perseguições (`actors/`, GDD Seção 8): o motorista em
+## pânico não atira — o risco é a lataria (batida forte machuca, carro
+## destruído recomeça a missão), os obstáculos na pista e o suspeito
+## escapando se o Mark ficar longe demais por tempo demais.
 
 const TRACK_SIZE := Vector2(820.0, 460.0)
 const TRACK_ORIGIN := Vector2(60.0, 40.0)
 const WALL_THICK := 20.0
-
-const MAX_SPEED := 185.0
-const ACCEL := 220.0
-const BRAKE_DECEL := 420.0
-const REVERSE_SPEED := 100.0
-const COAST_DECEL := 90.0
-
-const TURN_RATE := 2.6
-const HANDBRAKE_TURN_BONUS := 1.2
-const HANDBRAKE_SPEED_PENALTY := 0.55
-const STEER_DEADZONE := 0.2
-
-const PIT_RANGE := 70.0
-const PIT_ANGLE_DOT := 0.6
-
-var player_car: CharacterBody2D
-var player_speed := 0.0
-
-var fleeing_car: CharacterBody2D
-var _waypoints: Array[Vector2] = []
-var _wp_index := 0
 const FLEEING_SPEED := 140.0
-var fleeing_active := false
-var fleeing_spinning := false
-var pit_landed := false
-var _spin_timer := 0.0
+const GHOST_TIME := 1.6
+const WALL_COLOR := Color(0.3, 0.3, 0.35)
+const BLOCK_COLOR := Color(0.4, 0.33, 0.25)
+const PARKED_COLOR := Color(0.35, 0.4, 0.45)
+
+var car: PlayerCar
+var chase: ChaseLayer
+var fleeing_car: EnemyCar
 
 var ghost_car: CharacterBody2D
 var ghost_active := false
 var _ghost_timer := 0.0
-const GHOST_SPEED := 220.0
 var ghost_start: Vector2
 var ghost_end: Vector2
 
@@ -57,15 +37,16 @@ var status_label: Label
 var next_btn: Button
 var _controls_locked := true
 var _phase := "intro"
-## intro -> chase -> ghost_glimpse -> outro -> done
+## intro -> chase -> ghost_glimpse -> outro -> done (ou down -> recomeça)
 
 const SCENE_PATH := "res://missions/ato2_turno4_semaforo.tscn"
 
 
 func _ready() -> void:
 	_build_track()
-	_build_player_car()
-	_build_fleeing_car()
+	chase = ChaseLayer.new()
+	add_child(chase)
+	_build_cars()
 	_build_hud()
 	_build_controls()
 	_build_story_box()
@@ -74,7 +55,7 @@ func _ready() -> void:
 		[
 			"O semáforo da Décima com Industrial pisca duas vezes e apaga. Ninguém percebe até ser tarde demais.",
 			"Um carro corta o cruzamento, bate de leve num poste e sai em disparada — pânico, não maldade, mas foge do jeito que importa.",
-			"Doyle, do rádio: \"Vai atrás, eu cuido do ferido aqui!\"",
+			"Doyle, do rádio: \"Vai atrás, eu cuido do ferido aqui! E não me volta com a viatura amassada.\"",
 		],
 		["", "", "Sgt. Doyle"]
 	)
@@ -82,69 +63,70 @@ func _ready() -> void:
 
 # ---------- construção da cena ----------
 
+func _add_block(r: Rect2, color: Color) -> void:
+	var body := StaticBody2D.new()
+	var shape := CollisionShape2D.new()
+	var rect_shape := RectangleShape2D.new()
+	rect_shape.size = r.size
+	shape.shape = rect_shape
+	shape.position = r.size * 0.5
+	body.add_child(shape)
+	body.position = r.position
+	add_child(body)
+
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([Vector2.ZERO, Vector2(r.size.x, 0), r.size, Vector2(0, r.size.y)])
+	poly.color = color
+	poly.position = r.position
+	add_child(poly)
+
+
 func _build_track() -> void:
 	var top := TRACK_ORIGIN
 	var w := TRACK_SIZE.x
 	var h := TRACK_SIZE.y
-	var rects: Array[Rect2] = [
-		Rect2(top, Vector2(w, WALL_THICK)),
-		Rect2(Vector2(top.x, top.y + h - WALL_THICK), Vector2(w, WALL_THICK)),
-		Rect2(top, Vector2(WALL_THICK, h)),
-		Rect2(Vector2(top.x + w - WALL_THICK, top.y), Vector2(WALL_THICK, h)),
-	]
-	for r in rects:
-		var body := StaticBody2D.new()
-		var shape := CollisionShape2D.new()
-		var rect_shape := RectangleShape2D.new()
-		rect_shape.size = r.size
-		shape.shape = rect_shape
-		shape.position = r.size * 0.5
-		body.add_child(shape)
-		body.position = r.position
-		add_child(body)
+	_add_block(Rect2(top, Vector2(w, WALL_THICK)), WALL_COLOR)
+	_add_block(Rect2(Vector2(top.x, top.y + h - WALL_THICK), Vector2(w, WALL_THICK)), WALL_COLOR)
+	_add_block(Rect2(top, Vector2(WALL_THICK, h)), WALL_COLOR)
+	_add_block(Rect2(Vector2(top.x + w - WALL_THICK, top.y), Vector2(WALL_THICK, h)), WALL_COLOR)
+	# Quarteirão no meio (não dá pra cortar caminho), postes na parte de
+	# dentro das curvas e carros estacionados na faixa de fora.
+	_add_block(Rect2(top + Vector2(200, 190), Vector2(420, 80)), BLOCK_COLOR)
+	_add_block(Rect2(top + Vector2(140, 140), Vector2(25, 25)), BLOCK_COLOR)
+	_add_block(Rect2(top + Vector2(w - 145, h - 145), Vector2(25, 25)), BLOCK_COLOR)
+	_add_block(Rect2(top + Vector2(360, 30), Vector2(50, 24)), PARKED_COLOR)
+	_add_block(Rect2(top + Vector2(450, h - 54), Vector2(50, 24)), PARKED_COLOR)
 
-		var poly := Polygon2D.new()
-		poly.polygon = PackedVector2Array([Vector2.ZERO, Vector2(r.size.x, 0), r.size, Vector2(0, r.size.y)])
-		poly.color = Color(0.3, 0.3, 0.35)
-		poly.position = r.position
-		add_child(poly)
+	ghost_start = top + Vector2(-40, h * 0.5)
+	ghost_end = top + Vector2(w + 40, h * 0.5)
 
-	_waypoints = [
+
+func _build_cars() -> void:
+	var top := TRACK_ORIGIN
+	var w := TRACK_SIZE.x
+	var h := TRACK_SIZE.y
+
+	car = PlayerCar.new()
+	car.position = top + Vector2(40, 100)
+	add_child(car)
+	chase.setup(car)
+	chase.pit_enabled = true
+	chase.player_wrecked.connect(_on_failed.bind("A viatura não aguentou mais. O suspeito sumiu no trânsito."))
+	chase.suspect_escaped.connect(_on_failed.bind("Longe demais — o suspeito sumiu no trânsito."))
+	chase.enemy_disabled.connect(_on_pit_landed)
+
+	fleeing_car = EnemyCar.new()
+	fleeing_car.waypoints = [
 		top + Vector2(100, 100),
 		top + Vector2(w - 100, 100),
 		top + Vector2(w - 100, h - 100),
 		top + Vector2(100, h - 100),
 	]
-	ghost_start = top + Vector2(-40, h * 0.5)
-	ghost_end = top + Vector2(w + 40, h * 0.5)
-
-
-func _build_player_car() -> void:
-	player_car = CharacterBody2D.new()
-	var shape := CollisionShape2D.new()
-	var rect := RectangleShape2D.new()
-	rect.size = Vector2(28, 16)
-	shape.shape = rect
-	player_car.add_child(shape)
-	player_car.position = TRACK_ORIGIN + Vector2(80, 80)
-	add_child(player_car)
-
-	var camera := Camera2D.new()
-	camera.enabled = true
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 5.0
-	player_car.add_child(camera)
-
-
-func _build_fleeing_car() -> void:
-	fleeing_car = CharacterBody2D.new()
-	var shape := CollisionShape2D.new()
-	var rect := RectangleShape2D.new()
-	rect.size = Vector2(28, 16)
-	shape.shape = rect
-	fleeing_car.add_child(shape)
-	fleeing_car.position = _waypoints[0]
-	add_child(fleeing_car)
+	fleeing_car.position = fleeing_car.waypoints[0]
+	fleeing_car.speed = FLEEING_SPEED
+	fleeing_car.max_hp = 99.0
+	chase.add_enemy(fleeing_car)
+	chase.escape_target = fleeing_car
 
 
 func _build_hud() -> void:
@@ -194,10 +176,8 @@ func _build_controls() -> void:
 
 	accel_btn = _corner_button("accelerate", tr("ACELERAR"), 30, 30, 110, 110)
 	layer.add_child(accel_btn)
-
 	brake_btn = _corner_button("brake", tr("FREAR"), 160, 40, 100, 100)
 	layer.add_child(brake_btn)
-
 	pit_btn = _corner_button("handbrake", tr("FREIO DE\nMÃO / PIT"), 30, 160, 110, 110)
 	layer.add_child(pit_btn)
 
@@ -234,7 +214,7 @@ func _on_story_finished() -> void:
 		"intro":
 			_phase = "chase"
 			_controls_locked = false
-			fleeing_active = true
+			chase.set_active(true)
 		"ghost_glimpse":
 			_phase = "outro"
 			story.say(
@@ -250,12 +230,12 @@ func _on_story_finished() -> void:
 			next_btn.visible = true
 
 
-func _check_pit_complete() -> void:
-	if not pit_landed or _phase != "chase":
+func _on_pit_landed(_c: EnemyCar) -> void:
+	if _phase != "chase":
 		return
-	fleeing_active = false
 	_phase = "ghost_glimpse"
 	_controls_locked = true
+	chase.set_active(false)
 	ghost_active = true
 	_ghost_timer = 0.0
 	story.say(
@@ -266,104 +246,27 @@ func _check_pit_complete() -> void:
 	)
 
 
+func _on_failed(reason: String) -> void:
+	if _phase != "chase":
+		return
+	_phase = "down"
+	_controls_locked = true
+	status_label.text = tr(reason) + "  " + tr("Recomeçando a missão...")
+	chase.restart_mission()
+
+
 # ---------- lógica de jogo ----------
 
 func _process(delta: float) -> void:
-	_update_drive_buttons()
-	if not _controls_locked:
-		_drive_player(delta)
-	if fleeing_active:
-		_drive_fleeing(delta)
-		_try_pit()
+	car.controls_locked = _controls_locked
+	var driving := not _controls_locked
+	accel_btn.visible = driving
+	brake_btn.visible = driving
+	pit_btn.visible = driving
 	if ghost_active:
 		_update_ghost(delta)
 	_update_hud()
 	queue_redraw()
-
-
-func _update_drive_buttons() -> void:
-	# Visíveis só quando os controles estão livres — mesmo bug que a
-	# Fase 3 teve antes de corrigir (botão ficava visível por padrão
-	# inclusive durante diálogo travado, já que nada definia o estado
-	# inicial). Ligado direto ao flag, nunca mais dessincroniza.
-	accel_btn.visible = not _controls_locked
-	brake_btn.visible = not _controls_locked
-	pit_btn.visible = not _controls_locked
-
-
-func _drive_player(delta: float) -> void:
-	var accelerating := InputBridge.is_held("accelerate")
-	var braking := InputBridge.is_held("brake")
-	var handbraking := InputBridge.is_held("handbrake")
-
-	if accelerating and not braking:
-		player_speed = move_toward(player_speed, MAX_SPEED, ACCEL * delta)
-	elif braking:
-		if player_speed > 0.0:
-			player_speed = move_toward(player_speed, 0.0, BRAKE_DECEL * delta)
-		else:
-			player_speed = move_toward(player_speed, -REVERSE_SPEED, ACCEL * delta)
-	else:
-		player_speed = move_toward(player_speed, 0.0, COAST_DECEL * delta)
-
-	var turn_mult: float = TURN_RATE + (HANDBRAKE_TURN_BONUS if handbraking else 0.0)
-	var speed_cap: float = MAX_SPEED * (HANDBRAKE_SPEED_PENALTY if handbraking else 1.0)
-	player_speed = clamp(player_speed, -REVERSE_SPEED, speed_cap)
-
-	if InputBridge.move_vector.length() >= STEER_DEADZONE and absf(player_speed) > 5.0:
-		var desired_angle := InputBridge.move_vector.angle()
-		var diff := wrapf(desired_angle - player_car.rotation, -PI, PI)
-		var speed_factor: float = clamp(absf(player_speed) / MAX_SPEED, 0.35, 1.0)
-		var max_step: float = turn_mult * speed_factor * delta
-		player_car.rotation += clamp(diff, -max_step, max_step)
-
-	player_car.velocity = Vector2.RIGHT.rotated(player_car.rotation) * player_speed
-	player_car.move_and_slide()
-
-
-func _drive_fleeing(delta: float) -> void:
-	if fleeing_spinning:
-		_spin_timer -= delta
-		fleeing_car.rotation += 6.0 * delta
-		fleeing_car.velocity = Vector2.ZERO
-		fleeing_car.move_and_slide()
-		if _spin_timer <= 0.0:
-			fleeing_spinning = false
-		return
-	if pit_landed:
-		return
-
-	var dest: Vector2 = _waypoints[_wp_index]
-	var to_dest := dest - fleeing_car.position
-	if to_dest.length() < 12.0:
-		_wp_index = (_wp_index + 1) % _waypoints.size()
-		dest = _waypoints[_wp_index]
-		to_dest = dest - fleeing_car.position
-
-	fleeing_car.rotation = to_dest.angle()
-	fleeing_car.velocity = to_dest.normalized() * FLEEING_SPEED
-	fleeing_car.move_and_slide()
-
-
-func _try_pit() -> void:
-	if pit_landed or fleeing_spinning or _phase != "chase":
-		return
-	if not InputBridge.is_held("handbrake"):
-		return
-
-	var to_target := fleeing_car.position - player_car.position
-	var dist := to_target.length()
-	var behind_dot := Vector2.RIGHT.rotated(player_car.rotation).dot(to_target.normalized())
-	if dist > PIT_RANGE or behind_dot <= PIT_ANGLE_DOT:
-		return
-
-	for i in player_car.get_slide_collision_count():
-		if player_car.get_slide_collision(i).get_collider() == fleeing_car:
-			fleeing_spinning = true
-			_spin_timer = 1.2
-			pit_landed = true
-			_check_pit_complete()
-			return
 
 
 func _update_ghost(delta: float) -> void:
@@ -376,41 +279,42 @@ func _update_ghost(delta: float) -> void:
 		ghost_car.add_child(shape)
 		ghost_car.position = ghost_start
 		ghost_car.rotation = (ghost_end - ghost_start).angle()
+		# Só um beat visual: não colide com nada nem atrapalha a cena.
+		ghost_car.collision_layer = 0
+		ghost_car.collision_mask = 0
 		add_child(ghost_car)
 
 	_ghost_timer += delta
-	ghost_car.position = ghost_start.lerp(ghost_end, clamp(_ghost_timer / 1.6, 0.0, 1.0))
-	if _ghost_timer >= 1.6:
+	ghost_car.position = ghost_start.lerp(ghost_end, clampf(_ghost_timer / GHOST_TIME, 0.0, 1.0))
+	if _ghost_timer >= GHOST_TIME:
 		ghost_active = false
 		GameState.ghost_spotted = true
+
+
+func _bar(frac: float) -> String:
+	var n := int(round(clampf(frac, 0.0, 1.0) * 10.0))
+	return "[" + "#".repeat(n) + "-".repeat(10 - n) + "]"
 
 
 func _update_hud() -> void:
 	match _phase:
 		"chase":
-			status_label.text = tr("Alinhe atrás do carro e segure FREIO DE MÃO/PIT — precisa bater nele pra funcionar.")
+			status_label.text = tr("Encoste atrás dele e segure FREIO DE MÃO/PIT. Não fique longe — ele some.") + "\n" + tr("Lataria: %d%%") % int(car.hp) + "   " + tr("Fugindo: %s") % _bar(chase.escape_progress)
 		"done":
 			status_label.text = tr("Turno 4 concluído.")
+		"down":
+			pass
 		_:
 			status_label.text = ""
 
 
 func _draw() -> void:
-	if player_car:
-		_draw_car(player_car.position, player_car.rotation, Color(0.3, 0.6, 0.9))
-	if fleeing_car and fleeing_active:
-		_draw_car(fleeing_car.position, fleeing_car.rotation, Color(0.4, 0.4, 0.4) if pit_landed else Color(0.9, 0.3, 0.3))
 	if ghost_car and ghost_active:
-		_draw_car(ghost_car.position, ghost_car.rotation, Color(0.15, 0.15, 0.15))
-
-
-func _draw_car(pos: Vector2, rot: float, color: Color) -> void:
-	var half := Vector2(14, 8)
-	var points := PackedVector2Array([
-		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
-		Vector2(half.x, half.y), Vector2(-half.x, half.y)
-	])
-	for i in points.size():
-		points[i] = pos + points[i].rotated(rot)
-	draw_colored_polygon(points, color)
-	draw_line(pos, pos + Vector2.RIGHT.rotated(rot) * 20.0, Color.WHITE, 2.0)
+		var half := Vector2(14, 8)
+		var points := PackedVector2Array([
+			Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
+			Vector2(half.x, half.y), Vector2(-half.x, half.y)
+		])
+		for i in points.size():
+			points[i] = ghost_car.position + points[i].rotated(ghost_car.rotation)
+		draw_colored_polygon(points, Color(0.15, 0.15, 0.15))

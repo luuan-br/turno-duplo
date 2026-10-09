@@ -1,43 +1,25 @@
 extends Node2D
 ## Ato 4, Fase 2 — "A Perseguição" (docs/ROTEIRO.md). Primeiro confronto
 ## direto com Wade "Ghost" Calloway — paga a rivalidade plantada sem
-## rosto no Turno 4 do Ato 2 e nomeada no Ato 3. Resolve DUAS pendências
-## registradas na Seção 8 do GDD de uma vez: "atirar dirigindo" (mira
-## automática — cone à frente do carro, sem apontar manual, como o GDD
-## já define) e "múltiplas formas de encerrar perseguição" (aqui:
-## atirar no pneu OU bater até o carro quebrar — dano acumulado, não só
-## PIT). Ghost absorve mais dano que o fugitivo comum do Turno 4: é pra
-## ser um adversário de verdade, não um reaproveitamento 1:1.
+## rosto no Turno 4 do Ato 2 e nomeada no Ato 3. Termina batendo nele até
+## quebrar ou atirando no pneu (mira automática por cone à frente).
+##
+## Risco real nas perseguições (`actors/`, GDD Seção 8): o Ghost não está
+## sozinho — o parceiro atira pela janela de trás (com a linha de mira
+## avisando antes), ele dá freada brusca quando o Mark cola atrás, a
+## lataria do Mark aguenta só até certo ponto, e longe demais por tempo
+## demais ele escapa. Carro destruído ou Ghost escapando = recomeça.
 
 const TRACK_SIZE := Vector2(900.0, 500.0)
 const TRACK_ORIGIN := Vector2(60.0, 40.0)
 const WALL_THICK := 20.0
+const TIRE_SHOT_DAMAGE := 2.0
+const WALL_COLOR := Color(0.14, 0.14, 0.18)
+const BLOCK_COLOR := Color(0.3, 0.27, 0.22)
 
-const MAX_SPEED := 200.0
-const ACCEL := 230.0
-const BRAKE_DECEL := 420.0
-const REVERSE_SPEED := 100.0
-const COAST_DECEL := 90.0
-const TURN_RATE := 2.6
-const STEER_DEADZONE := 0.2
-
-const GHOST_SPEED := 175.0
-const GHOST_DAMAGE_MAX := 3
-const RAM_COOLDOWN := 0.6
-const FIRE_CONE_RANGE := 220.0
-const FIRE_CONE_DOT := 0.92
-
-var player_car: CharacterBody2D
-var player_speed := 0.0
-
-var ghost_car: CharacterBody2D
-var _waypoints: Array[Vector2] = []
-var _wp_index := 0
-var ghost_damage := 0
-var ghost_defeated := false
-var ghost_spinning := false
-var _spin_timer := 0.0
-var _ram_cooldown := 0.0
+var car: PlayerCar
+var chase: ChaseLayer
+var ghost: EnemyCar
 
 var accel_btn: Control
 var brake_btn: Control
@@ -47,93 +29,103 @@ var status_label: Label
 var next_btn: Button
 var _controls_locked := true
 var _phase := "intro"
-## intro -> chase -> outro -> done
-
-var _fire_target_valid := false
+## intro -> chase -> outro -> done (ou down -> recomeça)
 
 const SCENE_PATH := "res://missions/ato4_fase2_perseguicao.tscn"
 
 
 func _ready() -> void:
 	_build_track()
-	_build_player_car()
-	_build_ghost_car()
+	chase = ChaseLayer.new()
+	add_child(chase)
+	_build_cars()
 	_build_hud()
 	_build_controls()
 	_build_story_box()
 
 	story.say(
 		[
-			"Um carro sai em disparada do fim do Cais no instante em que o segundo guarda cai — alguém avisou alguém, em algum lugar.",
+			"Um carro sai em disparada do fim do Cais no instante em que o último guarda cai — alguém avisou alguém, em algum lugar.",
 			"Theo reconhece o jeito de dirigir antes mesmo da placa. \"É ele. É o Ghost.\"",
+			"Pela janela de trás, um braço com uma arma aparece. O Ghost não dirige sozinho.",
 			"Pela primeira vez, Mark vai atrás de um nome, não de uma sombra.",
 		],
-		["", "Theo Marsh", ""]
+		["", "Theo Marsh", "", ""]
 	)
+
+
+# ---------- construção da cena ----------
+
+func _add_block(r: Rect2, color: Color) -> void:
+	var body := StaticBody2D.new()
+	var shape := CollisionShape2D.new()
+	var rect_shape := RectangleShape2D.new()
+	rect_shape.size = r.size
+	shape.shape = rect_shape
+	shape.position = r.size * 0.5
+	body.add_child(shape)
+	body.position = r.position
+	add_child(body)
+
+	var poly := Polygon2D.new()
+	poly.polygon = PackedVector2Array([Vector2.ZERO, Vector2(r.size.x, 0), r.size, Vector2(0, r.size.y)])
+	poly.color = color
+	poly.position = r.position
+	add_child(poly)
 
 
 func _build_track() -> void:
 	var top := TRACK_ORIGIN
 	var w := TRACK_SIZE.x
 	var h := TRACK_SIZE.y
-	var rects: Array[Rect2] = [
-		Rect2(top, Vector2(w, WALL_THICK)),
-		Rect2(Vector2(top.x, top.y + h - WALL_THICK), Vector2(w, WALL_THICK)),
-		Rect2(top, Vector2(WALL_THICK, h)),
-		Rect2(Vector2(top.x + w - WALL_THICK, top.y), Vector2(WALL_THICK, h)),
-	]
-	for r in rects:
-		var body := StaticBody2D.new()
-		var shape := CollisionShape2D.new()
-		var rect_shape := RectangleShape2D.new()
-		rect_shape.size = r.size
-		shape.shape = rect_shape
-		shape.position = r.size * 0.5
-		body.add_child(shape)
-		body.position = r.position
-		add_child(body)
+	_add_block(Rect2(top, Vector2(w, WALL_THICK)), WALL_COLOR)
+	_add_block(Rect2(Vector2(top.x, top.y + h - WALL_THICK), Vector2(w, WALL_THICK)), WALL_COLOR)
+	_add_block(Rect2(top, Vector2(WALL_THICK, h)), WALL_COLOR)
+	_add_block(Rect2(Vector2(top.x + w - WALL_THICK, top.y), Vector2(WALL_THICK, h)), WALL_COLOR)
+	# Pátio de contêineres no meio: força a volta inteira e serve de
+	# cobertura contra o tiro do parceiro do Ghost (quebra a linha de mira).
+	_add_block(Rect2(top + Vector2(280, 180), Vector2(400, 140)), BLOCK_COLOR)
+	_add_block(Rect2(top + Vector2(520, 24), Vector2(40, 26)), BLOCK_COLOR)
+	_add_block(Rect2(top + Vector2(590, h - 60), Vector2(40, 26)), BLOCK_COLOR)
 
-		var poly := Polygon2D.new()
-		poly.polygon = PackedVector2Array([Vector2.ZERO, Vector2(r.size.x, 0), r.size, Vector2(0, r.size.y)])
-		poly.color = Color(0.14, 0.14, 0.18)
-		poly.position = r.position
-		add_child(poly)
 
-	_waypoints = [
+func _build_cars() -> void:
+	var top := TRACK_ORIGIN
+	var w := TRACK_SIZE.x
+	var h := TRACK_SIZE.y
+
+	car = PlayerCar.new()
+	car.position = top + Vector2(60, 100)
+	car.max_speed = 200.0
+	car.accel = 230.0
+	add_child(car)
+	chase.setup(car)
+	chase.ram_damage = 1.0
+	chase.aim_mode = 1
+	chase.escape_distance = 420.0
+	chase.escape_time = 5.0
+	chase.player_wrecked.connect(_on_failed.bind("O carro não aguentou mais — o Ghost sumiu na noite."))
+	chase.suspect_escaped.connect(_on_failed.bind("Longe demais — o Ghost sumiu na noite."))
+	chase.enemy_disabled.connect(_on_ghost_down)
+
+	ghost = EnemyCar.new()
+	ghost.waypoints = [
 		top + Vector2(120, 100),
 		top + Vector2(w - 120, 90),
 		top + Vector2(w - 100, h - 110),
 		top + Vector2(380, h - 90),
 		top + Vector2(120, h - 250),
 	]
-
-
-func _build_player_car() -> void:
-	player_car = CharacterBody2D.new()
-	var shape := CollisionShape2D.new()
-	var rect := RectangleShape2D.new()
-	rect.size = Vector2(28, 16)
-	shape.shape = rect
-	player_car.add_child(shape)
-	player_car.position = TRACK_ORIGIN + Vector2(80, 80)
-	add_child(player_car)
-
-	var camera := Camera2D.new()
-	camera.enabled = true
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 5.0
-	player_car.add_child(camera)
-
-
-func _build_ghost_car() -> void:
-	ghost_car = CharacterBody2D.new()
-	var shape := CollisionShape2D.new()
-	var rect := RectangleShape2D.new()
-	rect.size = Vector2(28, 16)
-	shape.shape = rect
-	ghost_car.add_child(shape)
-	ghost_car.position = _waypoints[0]
-	add_child(ghost_car)
+	ghost.position = ghost.waypoints[0]
+	ghost.speed = 175.0
+	ghost.max_hp = 3.0
+	ghost.body_color = Color(0.15, 0.15, 0.15)
+	ghost.shooter = true
+	ghost.shot_damage = 20.0
+	ghost.fire_cooldown = 2.0
+	ghost.brake_check = true
+	chase.add_enemy(ghost)
+	chase.escape_target = ghost
 
 
 func _build_hud() -> void:
@@ -183,10 +175,8 @@ func _build_controls() -> void:
 
 	accel_btn = _corner_button("accelerate", tr("ACELERAR"), 30, 30, 110, 110)
 	layer.add_child(accel_btn)
-
 	brake_btn = _corner_button("brake", tr("FREAR"), 160, 40, 100, 100)
 	layer.add_child(brake_btn)
-
 	fire_btn = _corner_button("shoot", tr("ATIRAR\nNO PNEU"), 30, 160, 110, 110)
 	fire_btn.visible = false
 	layer.add_child(fire_btn)
@@ -217,24 +207,25 @@ func _build_story_box() -> void:
 	story.finished.connect(_on_story_finished)
 
 
+# ---------- fluxo ----------
+
 func _on_story_finished() -> void:
 	match _phase:
 		"intro":
 			_phase = "chase"
 			_controls_locked = false
+			chase.set_active(true)
 		"outro":
 			_phase = "done"
 			next_btn.visible = true
 
 
-func _check_ghost_defeated() -> void:
-	if ghost_defeated or ghost_damage < GHOST_DAMAGE_MAX or _phase != "chase":
+func _on_ghost_down(_c: EnemyCar) -> void:
+	if _phase != "chase":
 		return
-	ghost_defeated = true
-	ghost_spinning = true
-	_spin_timer = 1.2
 	_phase = "outro"
 	_controls_locked = true
+	chase.set_active(false)
 	story.say(
 		[
 			"O carro do Ghost derrapa, bate de lado no guard-rail e para torto, fumaça saindo do capô.",
@@ -247,130 +238,38 @@ func _check_ghost_defeated() -> void:
 	)
 
 
-func _process(delta: float) -> void:
-	_update_drive_buttons()
-	if not _controls_locked:
-		_drive_player(delta)
-	if _phase == "chase":
-		_drive_ghost(delta)
-		_try_ram()
-		_check_fire_cone()
-	if _ram_cooldown > 0.0:
-		_ram_cooldown -= delta
+func _on_failed(reason: String) -> void:
+	if _phase != "chase":
+		return
+	_phase = "down"
+	_controls_locked = true
+	status_label.text = tr(reason) + "  " + tr("Recomeçando a missão...")
+	chase.restart_mission()
+
+
+func _process(_delta: float) -> void:
+	car.controls_locked = _controls_locked
+	var driving := not _controls_locked
+	accel_btn.visible = driving
+	brake_btn.visible = driving
+	fire_btn.visible = driving and chase.auto_target != null
+	if InputBridge.consume_just_pressed("shoot") and driving:
+		chase.fire_auto(TIRE_SHOT_DAMAGE)
 	_update_hud()
-	queue_redraw()
 
 
-func _update_drive_buttons() -> void:
-	accel_btn.visible = not _controls_locked
-	brake_btn.visible = not _controls_locked
-
-
-func _drive_player(delta: float) -> void:
-	var accelerating := InputBridge.is_held("accelerate")
-	var braking := InputBridge.is_held("brake")
-
-	if accelerating and not braking:
-		player_speed = move_toward(player_speed, MAX_SPEED, ACCEL * delta)
-	elif braking:
-		if player_speed > 0.0:
-			player_speed = move_toward(player_speed, 0.0, BRAKE_DECEL * delta)
-		else:
-			player_speed = move_toward(player_speed, -REVERSE_SPEED, ACCEL * delta)
-	else:
-		player_speed = move_toward(player_speed, 0.0, COAST_DECEL * delta)
-
-	player_speed = clamp(player_speed, -REVERSE_SPEED, MAX_SPEED)
-
-	if InputBridge.move_vector.length() >= STEER_DEADZONE and absf(player_speed) > 5.0:
-		var desired_angle := InputBridge.move_vector.angle()
-		var diff := wrapf(desired_angle - player_car.rotation, -PI, PI)
-		var speed_factor: float = clamp(absf(player_speed) / MAX_SPEED, 0.35, 1.0)
-		var max_step: float = TURN_RATE * speed_factor * delta
-		player_car.rotation += clamp(diff, -max_step, max_step)
-
-	player_car.velocity = Vector2.RIGHT.rotated(player_car.rotation) * player_speed
-	player_car.move_and_slide()
-
-
-func _drive_ghost(delta: float) -> void:
-	if ghost_spinning:
-		_spin_timer -= delta
-		ghost_car.rotation += 5.0 * delta
-		ghost_car.velocity = Vector2.ZERO
-		ghost_car.move_and_slide()
-		return
-	if ghost_defeated:
-		return
-
-	var dest: Vector2 = _waypoints[_wp_index]
-	var to_dest := dest - ghost_car.position
-	if to_dest.length() < 14.0:
-		_wp_index = (_wp_index + 1) % _waypoints.size()
-		dest = _waypoints[_wp_index]
-		to_dest = dest - ghost_car.position
-
-	ghost_car.rotation = to_dest.angle()
-	ghost_car.velocity = to_dest.normalized() * GHOST_SPEED
-	ghost_car.move_and_slide()
-
-
-func _try_ram() -> void:
-	if ghost_defeated or ghost_spinning or _ram_cooldown > 0.0:
-		return
-	for i in player_car.get_slide_collision_count():
-		if player_car.get_slide_collision(i).get_collider() == ghost_car:
-			ghost_damage += 1
-			_ram_cooldown = RAM_COOLDOWN
-			_check_ghost_defeated()
-			return
-
-
-func _check_fire_cone() -> void:
-	if ghost_defeated or ghost_spinning:
-		fire_btn.visible = false
-		return
-
-	var to_ghost := ghost_car.position - player_car.position
-	var dist := to_ghost.length()
-	var facing := Vector2.RIGHT.rotated(player_car.rotation)
-	var dot := facing.dot(to_ghost.normalized()) if dist > 0.01 else 0.0
-
-	_fire_target_valid = dist <= FIRE_CONE_RANGE and dot >= FIRE_CONE_DOT
-	fire_btn.visible = _fire_target_valid
-
-	if _fire_target_valid and InputBridge.consume_just_pressed("shoot"):
-		ghost_damage += 2
-		_check_ghost_defeated()
+func _bar(frac: float) -> String:
+	var n := int(round(clampf(frac, 0.0, 1.0) * 10.0))
+	return "[" + "#".repeat(n) + "-".repeat(10 - n) + "]"
 
 
 func _update_hud() -> void:
 	match _phase:
 		"chase":
-			status_label.text = tr("Bata nele ou alinhe o carro à frente e ATIRE NO PNEU. Dano: %d/%d") % [ghost_damage, GHOST_DAMAGE_MAX]
+			status_label.text = tr("Bata forte nele ou alinhe à frente e ATIRE NO PNEU. Use os contêineres contra o tiro do parceiro.") + "\n" + tr("Lataria: %d%%") % int(car.hp) + "   " + tr("Ghost: %d/%d") % [int(maxf(ghost.hp, 0.0)), int(ghost.max_hp)] + "   " + tr("Fugindo: %s") % _bar(chase.escape_progress)
 		"done":
 			status_label.text = tr("Fase 2 concluída.")
+		"down":
+			pass
 		_:
 			status_label.text = ""
-
-
-func _draw() -> void:
-	if player_car:
-		_draw_car(player_car.position, player_car.rotation, Color(0.3, 0.6, 0.9))
-		if _phase == "chase" and _fire_target_valid:
-			var facing := Vector2.RIGHT.rotated(player_car.rotation)
-			draw_dashed_line(player_car.position, player_car.position + facing * FIRE_CONE_RANGE, Color(1.0, 0.3, 0.3, 0.6), 2.0, 8.0)
-	if ghost_car:
-		_draw_car(ghost_car.position, ghost_car.rotation, Color(0.5, 0.5, 0.5) if ghost_defeated else Color(0.15, 0.15, 0.15))
-
-
-func _draw_car(pos: Vector2, rot: float, color: Color) -> void:
-	var half := Vector2(14, 8)
-	var points := PackedVector2Array([
-		Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
-		Vector2(half.x, half.y), Vector2(-half.x, half.y)
-	])
-	for i in points.size():
-		points[i] = pos + points[i].rotated(rot)
-	draw_colored_polygon(points, color)
-	draw_line(pos, pos + Vector2.RIGHT.rotated(rot) * 20.0, Color.WHITE, 2.0)

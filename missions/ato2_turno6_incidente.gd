@@ -127,7 +127,7 @@ func _build_door() -> void:
 	door_body.add_child(shape)
 	var gap := ROOM_ORIGIN.y + ROOM_SIZE.y * 0.5 - DOOR_GAP * 0.5
 	door_body.position = Vector2(ROOM_ORIGIN.x + ROOM_SIZE.x - WALL_THICK * 0.5, gap + DOOR_GAP * 0.5)
-	door_body.set_collision_layer_value(1, false)
+	# Sólida até arrombar — antes dava pra atravessar a porta fechada.
 	add_child(door_body)
 
 
@@ -291,6 +291,7 @@ func _update_door() -> void:
 		return
 	if InputBridge.consume_just_released("breach"):
 		door_open = true
+		door_body.set_collision_layer_value(1, false)
 		_phase = "ambush"
 		_controls_locked = true
 		_doyle_down = true
@@ -390,6 +391,8 @@ func _draw() -> void:
 		_draw_name_tag(doyle_marker.position, "Doyle")
 
 	if door_body:
+		if not door_open:
+			draw_rect(Rect2(door_body.position - Vector2(WALL_THICK, DOOR_GAP) * 0.5, Vector2(WALL_THICK, DOOR_GAP)), Color(0.45, 0.3, 0.2))
 		draw_circle(door_body.position, 8.0, Color.GREEN if door_open else Color(0.7, 0.15, 0.15))
 
 	if clue_obj and _phase in ["examine", "outro", "done"]:

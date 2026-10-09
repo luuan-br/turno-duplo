@@ -5,6 +5,14 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 ## [Não lançado]
 
 ### Adicionado
+- **Risco real nas perseguições** (mesmo problema do combate: o carro inimigo só dava voltas, nunca ameaçava, e o carro do jogador era indestrutível):
+  - **`actors/player_car.gd` (novo)**: carro do jogador como componente — o mesmo controle validado no celular (direção relativa à tela, botões de acelerar/frear/freio de mão), mais **lataria**: batida forte machuca e corta a velocidade, raspão não; carro destruído recomeça a missão.
+  - **`actors/enemy_car.gd` (novo)**: carro inimigo — foge por uma rota ou persegue o jogador; opcionalmente com **passageiro que atira** (linha de mira visível antes, como os guardas) e **freada brusca** quando o jogador cola atrás; quem persegue recua depois de bater. Roda/para quando a lataria acaba ou leva PIT.
+  - **`actors/chase_layer.gd` (novo)**: liga tudo numa missão — PIT, bater até quebrar, mira automática pra frente ou pra trás, **suspeito que escapa** se o jogador ficar longe demais por tempo demais (barra "Fugindo"), tiro aplicado na lataria, recomeço.
+  - **Ato 2, Turno 4 (Semáforo Cego)**: sem tiro (motorista em pânico) — quarteirão no meio, postes nas curvas, carros estacionados, lataria e o suspeito podendo escapar. PIT continua sendo o jeito de parar.
+  - **Ato 4, Fase 2 (A Perseguição)**: o parceiro do Ghost atira pela janela (pátio de contêineres no meio serve pra quebrar a linha de tiro), o Ghost dá freada brusca, lataria e fuga. Bater até quebrar e atirar no pneu continuam.
+  - **Ato 4, Fase 5 (fuga do Cofre)**: pista 2x mais longa com barreiras em zigue-zague e dois reforços atrás — um tenta bater, o outro atira —, largando um instante depois do jogador.
+  - **`sandbox/perseguicao.gd`** refeito com os componentes, com tudo ligado — é a referência viva.
 - **Combate com risco real espalhado pras missões** (piloto aprovado no celular: "ficou muito bom"):
   - **`actors/tactical_player.gd` (novo)**: o jogador tático virou componente — movimento, sprint com barulho, mira nova, toque duplo pra atirar, tiro por raio, colete e queda num lugar só. Substitui a lógica que estava copiada em cada missão de combate.
   - **`actors/combat_layer.gd` (novo)**: liga jogador e guardas numa missão — cria os guardas, aplica o tiro que acerta, espalha barulho, desenha anéis de som/linhas de tiro, recomeça a missão quando o Mark cai. Guardas ficam pausados durante o diálogo e só ligam quando o combate começa.
@@ -71,6 +79,8 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 - **Revertida a decisão de "consequência suave"** no combate (1ª versão do piloto: 4 de vida, ficar atordoado ao zerar). Pedido do usuário: um tiro derruba, colete é o que dá margem. Registrado no GDD Seção 8.
 
 ### Corrigido
+- **Portão do Cais (Ato 4 Fase 1) e porta do Incidente (Ato 2 Turno 6) não bloqueavam nada** — dava pra atravessar fechados, sem arrombar. Agora são sólidos (e aparecem como barra) até abrir.
+- **Inimigo pausado virava fantasma**: no Godot, pausar um nó também o tira da física — guarda/carro esperando o diálogo ou a largada não colidia. Agora continuam sólidos enquanto pausados.
 - **Ato 4, Fase 6 (O Arquiteto)**: a parede direita da sala de controle estava aberta pro vazio acima e abaixo do corredor — fechada, a passagem agora é só o corredor.
 - **Ato 2, Turno 6**: removida a fala final "Ato 3 ainda não foi construído", que tinha ficado desatualizada.
 - **Toque duplo**: pegar o manche pra mirar logo depois de um toque duplo soltava um tiro a mais sem querer.
