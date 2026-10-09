@@ -37,6 +37,7 @@ var is_wrecked := false
 var camera: Camera2D
 
 var _bump_cooldown: Dictionary = {}
+var _contacts: Dictionary = {}
 var _flash := 0.0
 
 
@@ -99,6 +100,7 @@ func _process(delta: float) -> void:
 	if is_wrecked or controls_locked:
 		speed = 0.0
 		velocity = Vector2.ZERO
+		_contacts.clear()
 		queue_redraw()
 		return
 	_drive(delta)
@@ -135,19 +137,25 @@ func _drive(delta: float) -> void:
 	velocity = forward() * speed
 	var pre := velocity
 	move_and_slide()
-	# A velocidade "interna" não pode passar do que o carro andou de verdade
-	# — senão, prensado na parede segurando ACELERAR, ela subia até o
-	# máximo e cada contato contava como batida a toda velocidade.
-	var actual := get_real_velocity().dot(forward())
-	if absf(actual) < absf(speed):
-		speed = actual
+	# Só o PRIMEIRO instante de um contato conta como batida. Encostado ou
+	# raspando (prensado na parede segurando ACELERAR) não é batida nova —
+	# senão o carro se destruía sozinho. Não cortar `speed` aqui: isso
+	# travava acelerar/virar sempre que o carro encostava em qualquer coisa.
+	var now: Dictionary = {}
 	for i in get_slide_collision_count():
 		var c := get_slide_collision(i)
 		var col := c.get_collider()
+		if col == null:
+			continue
+		var id := col.get_instance_id()
+		now[id] = true
+		if _contacts.has(id):
+			continue
 		var other_vel := Vector2.ZERO
 		if col is CharacterBody2D:
 			other_vel = col.velocity
 		register_impact(col, maxf(0.0, -(pre - other_vel).dot(c.get_normal())))
+	_contacts = now
 
 
 func _draw() -> void:

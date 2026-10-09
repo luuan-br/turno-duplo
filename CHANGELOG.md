@@ -79,6 +79,7 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 - **Revertida a decisão de "consequência suave"** no combate (1ª versão do piloto: 4 de vida, ficar atordoado ao zerar). Pedido do usuário: um tiro derruba, colete é o que dá margem. Registrado no GDD Seção 8.
 
 ### Corrigido
+- **Controle do carro travando nas perseguições (retorno do teste no celular)**: "às vezes o carro não acelera, freia ou dá ré, a direção fica confusa". Causa: a correção do bug "prensado na parede o carro se destruía" cortava a velocidade pra o quanto o carro tinha andado — qualquer encostada (parede, poste, outro carro) zerava a velocidade, e como o carro só vira com velocidade mínima, ele travava. Corrigido voltando o controle exatamente ao de antes e resolvendo o bug da parede de outro jeito: só o **primeiro instante** de um contato conta como batida; ficar encostado ou raspando não machuca de novo.
 - **Portão do Cais (Ato 4 Fase 1) e porta do Incidente (Ato 2 Turno 6) não bloqueavam nada** — dava pra atravessar fechados, sem arrombar. Agora são sólidos (e aparecem como barra) até abrir.
 - **Inimigo pausado virava fantasma**: no Godot, pausar um nó também o tira da física — guarda/carro esperando o diálogo ou a largada não colidia. Agora continuam sólidos enquanto pausados.
 - **Ato 4, Fase 6 (O Arquiteto)**: a parede direita da sala de controle estava aberta pro vazio acima e abaixo do corredor — fechada, a passagem agora é só o corredor.
