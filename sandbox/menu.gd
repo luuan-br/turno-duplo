@@ -33,6 +33,7 @@ const ENTRIES := [
 	["Epílogo", "res://missions/ato4_epilogo.tscn"],
 	["Sandbox Tático (mover, cobertura, espiar, arrombar, mirar/atirar)", "res://sandbox/tatico.tscn"],
 	["Sandbox Perseguição (dirigir, freio de mão, PIT maneuver)", "res://sandbox/perseguicao.tscn"],
+	["Sandbox Interrogatório (ler a deixa: pressionar, apoiar, mostrar prova)", "res://sandbox/interrogatorio.tscn"],
 ]
 
 

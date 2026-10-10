@@ -242,6 +242,18 @@ O PIT clássico (Ato 1 Fase 3, Ato 2 Turno 4) continua existindo nas fases que o
 ### Modo Diálogo / Quadro de Evidências
 - Sem manches: tela cheia de toque direto (tocar opções de diálogo, tocar e conectar pistas no quadro). O contraste de interface (de twin-stick pra toque direto) reforça o contraste de ritmo entre ação e investigação, em vez de precisar de uma transição de câmera cara de produzir.
 
+### Interrogatório (leitura de deixas) — piloto no sandbox
+Resposta ao Ato 3 ser a parte mais rasa do jogo depois que combate e perseguição ganharam risco real. Componente `ui/interrogation.gd` (movido a dados), piloto em `sandbox/interrogatorio.gd`.
+- **Rodadas**: o suspeito fala e deixa escapar uma **deixa** (linguagem corporal); o jogador escolhe **PRESSIONAR**, **APOIAR** ou **MOSTRAR PROVA** (abre a lista de provas que o Mark tem, com prova falsa no meio).
+- **A deixa segue uma regra fixa, pra ser leitura e não chute:**
+  - **Nervoso** (mexe nas mãos, fala rápido, sua) → mentindo sob pressão → **pressionar** quebra.
+  - **Assustado** (encolhe, olha pra porta, voz baixa) → com medo, não mentindo → **apoiar** faz falar; pressionar fecha.
+  - **Calmo demais** (sorri, resposta ensaiada) → mentira preparada → só a **prova certa** quebra.
+- **Errar gasta paciência**; sem paciência o suspeito se fecha. **Sem fail state**: a história segue com o que foi conseguido até ali — diferente do combate, aqui recomeçar não faz sentido (investigação, não reflexo).
+- **Regra de ouro (Seção 9):** cada informação revelada precisa valer algo depois. **Plano de aplicação, a confirmar depois do teste do sandbox:**
+  - **Ato 3 Fase 2 (Lou/Miko)**: interrogar o informante escolhido. Informação completa → uma pista a mais no Quadro (Fase 4) e a rotina do vigia na Vigilância (Fase 3). Se ele se fechar → avisa o grupo, e o vigia da Fase 3 fica mais atento.
+  - **Ato 3 Fase 6 (Doyle)**: o confronto vira interrogatório antes da escolha de 3 vias. A paciência do Doyle vem da relação construída no Ato 2 (`doyle_relationship`). Ler certo → ele admite a dívida que o encurralou (motivação do ROTEIRO), mudando o tom da escolha e uma fala do Epílogo.
+
 ### Mecânicas introduzidas por Ato
 
 | Ato | Mecânicas novas | Controles envolvidos |

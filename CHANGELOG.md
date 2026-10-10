@@ -5,6 +5,7 @@ Todas as mudanças notáveis do projeto ficam aqui, da mais recente pra mais ant
 ## [Não lançado]
 
 ### Adicionado
+- **Interrogatório com leitura de deixas — piloto no sandbox** (`ui/interrogation.gd` + `sandbox/interrogatorio.gd`, novo item no menu): primeira peça real do Modo Diálogo. Em rodadas, o suspeito fala e mostra uma deixa (nervoso, assustado ou calmo demais); o jogador escolhe PRESSIONAR, APOIAR ou MOSTRAR PROVA, seguindo uma regra fixa e aprendível. Errar gasta paciência; sem paciência ele se fecha e a história segue com o que foi conseguido. Toque direto, sem manches, botões grandes. Ainda **não aplicado** no Ato 3 — plano registrado no GDD Seção 8.
 - **Risco real nas perseguições** (mesmo problema do combate: o carro inimigo só dava voltas, nunca ameaçava, e o carro do jogador era indestrutível):
   - **`actors/player_car.gd` (novo)**: carro do jogador como componente — o mesmo controle validado no celular (direção relativa à tela, botões de acelerar/frear/freio de mão), mais **lataria**: batida forte machuca e corta a velocidade, raspão não; carro destruído recomeça a missão.
   - **`actors/enemy_car.gd` (novo)**: carro inimigo — foge por uma rota ou persegue o jogador; opcionalmente com **passageiro que atira** (linha de mira visível antes, como os guardas) e **freada brusca** quando o jogador cola atrás; quem persegue recua depois de bater. Roda/para quando a lataria acaba ou leva PIT.
