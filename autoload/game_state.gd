@@ -19,6 +19,13 @@ var informant_chosen: String = "" ## Ato 3 Fase 2 — "lou" ou "miko"
 var doyle_fate: String = ""     ## Ato 3 Fase 6 — "entregue", "saida" ou "confronto"
 var ghost_named: bool = false   ## Ato 3 Fase 4 — matrícula vira nome no quadro
 
+## Interrogatório do informante (Ato 3 Fase 2). `leads` guarda os ids do
+## que ele revelou: "rotina_vigia" ajuda na Vigilância (Fase 3),
+## "pista_extra" dá um par a mais no Quadro (Fase 4).
+var leads: Array = []
+var informant_warned: bool = false ## informante se fechou e avisou o grupo — vigia mais atento na Fase 3
+var doyle_confessed: bool = false  ## Ato 3 Fase 6 — Doyle admitiu a dívida no interrogatório (pesa no Epílogo)
+
 
 func add_reputation(amount: int) -> void:
 	reputation += amount
