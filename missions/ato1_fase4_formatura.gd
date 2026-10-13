@@ -216,9 +216,8 @@ func _on_ceremony_zone_entered(body: Node) -> void:
 			"Ironside. Aquilo ali come novato no café da manhã. Boa sorte, Reyes.",
 			"O pai de Mark também começou num bairro difícil. Talvez fosse por isso que nunca falava sobre o primeiro ano.",
 			"Fim da Fase 4 — Avaliação Final / Formatura. Fim do Ato 1 — Academia.",
-			"Ato 2 (Novato nas Ruas) ainda não foi construído.",
 		],
-		["Capitã Okafor", "Theo Marsh", "Capitã Okafor", "Capitã Okafor", "Theo Marsh", "", "", ""]
+		["Capitã Okafor", "Theo Marsh", "Capitã Okafor", "Capitã Okafor", "Theo Marsh", "", ""]
 	)
 
 

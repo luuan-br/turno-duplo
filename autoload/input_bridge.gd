@@ -21,6 +21,19 @@ var _last_hold_duration: Dictionary = {}
 var _claimed_touches: Dictionary = {}
 
 
+## Solta tudo (usado pelos testes entre uma fase e outra).
+func reset() -> void:
+	move_vector = Vector2.ZERO
+	aim_vector = Vector2.ZERO
+	aim_touching = false
+	_held.clear()
+	_just_pressed.clear()
+	_just_released.clear()
+	_hold_start_ms.clear()
+	_last_hold_duration.clear()
+	_claimed_touches.clear()
+
+
 func try_claim_touch(index: int) -> bool:
 	if _claimed_touches.get(index, false):
 		return false

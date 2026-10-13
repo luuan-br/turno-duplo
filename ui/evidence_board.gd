@@ -31,9 +31,14 @@ func _ready() -> void:
 	anchor_bottom = 1.0
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
+	# Fundo opaco: translúcido, o "< Menu" do HUD aparecia por trás dos
+	# cartões de baixo.
 	var bg := Panel.new()
 	bg.anchor_right = 1.0
 	bg.anchor_bottom = 1.0
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.2, 0.2, 0.23)
+	bg.add_theme_stylebox_override("panel", style)
 	add_child(bg)
 
 	var title := Label.new()
@@ -71,11 +76,13 @@ func setup(pairs: Array) -> void:
 	flat.shuffle()
 
 	var cols := 2
+	# Cabe 5 pares (10 cartões) com folga na tela paisagem — o par extra do
+	# interrogatório da Fase 2 do Ato 3 leva o quadro a 5.
 	var card_w := 320.0
-	var card_h := 70.0
+	var card_h := 64.0
 	var start_x := 40.0
-	var start_y := 70.0
-	var gap := 20.0
+	var start_y := 60.0
+	var gap := 12.0
 
 	for i in flat.size():
 		var col := i % cols

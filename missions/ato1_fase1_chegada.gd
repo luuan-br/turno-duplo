@@ -371,7 +371,7 @@ func _on_story_finished() -> void:
 				[
 					"Chega por hoje na pontaria. Amanhã a gente fala de abordagem — a diferença entre reagir e responder.",
 					"O pai de Mark nunca contou essas histórias. Talvez fosse por isso — não cabiam em conversa de jantar.",
-					"Fim da Fase 1 — Chegada. Próxima fase (Abordagem Tática) ainda não foi construída.",
+					"Fim da Fase 1 — Chegada.",
 				],
 				["Capitã Okafor", "", ""]
 			)
@@ -563,7 +563,7 @@ func _update_aim_preview() -> void:
 		_aim_hit_target = false
 	else:
 		_aim_end = result.position
-		_aim_hit_target = (result.collider in targets) and not result.collider.get_meta("hit")
+		_aim_hit_target = result.collider is Area2D and (result.collider in targets) and not result.collider.get_meta("hit")
 
 
 func _update_fire() -> void:
@@ -585,7 +585,7 @@ func _update_fire() -> void:
 		return
 
 	var collider = result.collider
-	if collider in targets and not collider.get_meta("hit"):
+	if collider is Area2D and collider in targets and not collider.get_meta("hit"):
 		collider.set_meta("hit", true)
 		_targets_hit += 1
 		_check_shooting_complete()

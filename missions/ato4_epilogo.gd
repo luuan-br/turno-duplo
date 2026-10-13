@@ -43,7 +43,7 @@ func _append_doyle_lines(lines: Array[String], speakers: Array[String]) -> void:
 			lines.append("O processo contra o Doyle segue na Corregedoria. Mark não se arrepende de ter entregado a ligação — só queria que doesse menos.")
 			speakers.append("")
 		"saida":
-			lines.append("Ninguém mais viu o Doyle desde o aviso que o Mark mandou. Em algum lugar, um ex-parceiro está vivo por causa de uma lealdade que a lei não reconheceria.")
+			lines.append("Ninguém mais viu o Doyle desde aquela conversa no apartamento. Em algum lugar, um ex-parceiro está vivo por causa de uma lealdade que a lei não reconheceria.")
 			speakers.append("")
 		"confronto":
 			lines.append("O Doyle aceitou depor contra os homens de Kessler em troca de uma pena menor. Não é perdão. É o mais perto disso que os dois vão chegar.")
@@ -51,6 +51,12 @@ func _append_doyle_lines(lines: Array[String], speakers: Array[String]) -> void:
 		_:
 			lines.append("O nome do Doyle ainda aparece nos relatórios do caso, de um jeito que Mark prefere não reler sozinho.")
 			speakers.append("")
+	# Paga o interrogatório da Fase 6 do Ato 3.
+	if GameState.doyle_confessed:
+		lines.append("Pelo menos Mark sabe o porquê: uma dívida com gente que não cobra com carta. Não absolve — mas explica.")
+	else:
+		lines.append("Mark nunca soube direito por que ele fez aquilo. Essa é a parte que mais pesa.")
+	speakers.append("")
 
 
 func _append_family_lines(lines: Array[String], speakers: Array[String]) -> void:

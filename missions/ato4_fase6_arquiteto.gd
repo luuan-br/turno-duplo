@@ -241,9 +241,7 @@ func _on_story_finished() -> void:
 			_phase = "corridor"
 			_controls_locked = false
 			_kessler_fleeing = true
-		"catch":
-			_phase = "outro"
-		"outro":
+		"catch", "outro":
 			_phase = "done"
 			next_btn.visible = true
 
@@ -288,8 +286,9 @@ func _check_catch() -> void:
 				"\"Isso não muda nada\", Kessler diz, sem fôlego, sem o controle de antes. \"Vão substituir cada parte do que eu construí.\"",
 				"\"Hoje não\", Mark responde. E pela primeira vez na carreira, não estava seguindo ordem de ninguém pra dizer isso.",
 				"Theo chega logo atrás, algema em punho, sem perguntar como o Mark chegou primeiro.",
+				"Fim da Fase 6 — O Arquiteto.",
 			],
-			["", "Adrian Kessler", "", ""]
+			["", "Adrian Kessler", "", "", ""]
 		)
 
 

@@ -50,9 +50,14 @@ func _ready() -> void:
 	anchor_bottom = 1.0
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
+	# Fundo opaco: translúcido, a cena e o "< Menu" apareciam por trás dos
+	# botões.
 	var bg := Panel.new()
 	bg.anchor_right = 1.0
 	bg.anchor_bottom = 1.0
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.2, 0.2, 0.23)
+	bg.add_theme_stylebox_override("panel", style)
 	add_child(bg)
 
 	var margin := MarginContainer.new()

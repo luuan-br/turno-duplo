@@ -310,7 +310,7 @@ func _on_story_finished() -> void:
 			story.say(
 				[
 					"Fim da instrução por hoje. Amanhã tem avaliação final — aí eu decido pra onde cada um de vocês vai.",
-					"Fim da Fase 3 — Direção Defensiva. Próxima fase (Avaliação Final / Formatura) ainda não foi construída.",
+					"Fim da Fase 3 — Direção Defensiva.",
 				],
 				["Capitã Okafor", ""]
 			)

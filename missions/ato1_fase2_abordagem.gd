@@ -341,7 +341,7 @@ func _on_story_finished() -> void:
 			_phase = "outro"
 			story.say(
 				[
-					"Fim da Fase 2 — Abordagem Tática. Próxima fase (Direção Defensiva) ainda não foi construída.",
+					"Fim da Fase 2 — Abordagem Tática.",
 				],
 				[""]
 			)
@@ -508,7 +508,7 @@ func _update_aim_preview() -> void:
 	else:
 		_aim_end = result.position
 		var c = result.collider
-		_aim_hit_threat = (c in threats) and not c.get_meta("hit")
+		_aim_hit_threat = c is Area2D and (c in threats) and not c.get_meta("hit")
 
 
 func _update_fire() -> void:
@@ -529,11 +529,11 @@ func _update_fire() -> void:
 		return
 
 	var collider = result.collider
-	if collider in threats and not collider.get_meta("hit"):
+	if collider is Area2D and collider in threats and not collider.get_meta("hit"):
 		collider.set_meta("hit", true)
 		_threats_hit += 1
 		_check_clearing_complete()
-	elif collider in non_threats and not collider.get_meta("hit"):
+	elif collider is Area2D and collider in non_threats and not collider.get_meta("hit"):
 		collider.set_meta("hit", true)
 		_non_threats_hit += 1
 

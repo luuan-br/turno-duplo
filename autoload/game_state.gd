@@ -27,6 +27,21 @@ var informant_warned: bool = false ## informante se fechou e avisou o grupo — 
 var doyle_confessed: bool = false  ## Ato 3 Fase 6 — Doyle admitiu a dívida no interrogatório (pesa no Epílogo)
 
 
+## Volta tudo ao começo de campanha (usado pelos testes; serve também pra
+## um futuro "Novo jogo").
+func reset() -> void:
+	reputation = 0
+	doyle_relationship = 0
+	ghost_spotted = false
+	family_meter = 0
+	informant_chosen = ""
+	doyle_fate = ""
+	ghost_named = false
+	leads = []
+	informant_warned = false
+	doyle_confessed = false
+
+
 func add_reputation(amount: int) -> void:
 	reputation += amount
 

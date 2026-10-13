@@ -6,6 +6,13 @@ extends Node2D
 ## grita, Mark recua pro início do trecho — pressão sem punição dura,
 ## coerente com "sem XP/grind" do GDD Seção 11, isso aqui é tensão, não
 ## skill check de precisão.
+##
+## Paga o interrogatório da Fase 2: se o informante entregou a rotina do
+## vigia (`"rotina_vigia" in GameState.leads`), o Mark chega no horário
+## certo — o vigia faz pausas pra fumar virado pro muro (janelas pra
+## passar). Se o informante se fechou e avisou o grupo
+## (`GameState.informant_warned`), o vigia mudou a rotina: enxerga mais
+## longe, anda mais rápido, sem pausa.
 
 const ALLEY_SIZE := Vector2(760.0, 300.0)
 const ALLEY_ORIGIN := Vector2(60.0, 100.0)
@@ -15,9 +22,16 @@ const SPEED_CAUTIOUS := 85.0
 const CONE_RANGE := 160.0
 const CONE_HALF_ANGLE := deg_to_rad(28.0)
 const GUARD_SPEED := 55.0
+const ALERT_RANGE_MULT := 1.4
+const ALERT_SPEED_MULT := 1.3
+const SMOKE_TIME := 3.5
 
 var player: CharacterBody2D
 var guard: Node2D
+var cone_range := CONE_RANGE
+var guard_speed := GUARD_SPEED
+var smoke_breaks := false
+var _smoke_timer := 0.0
 var guard_dir := 1
 var guard_from: Vector2
 var guard_to: Vector2
@@ -46,14 +60,20 @@ func _ready() -> void:
 	_build_controls()
 	_build_story_box()
 
-	story.say(
-		[
-			"O endereço que o Lou — ou o Miko, depende de quem falou — soltou dá nesse beco atrás de um depósito fechado.",
-			"Tem um cara de vigia, ida e volta, lento, mas atento. Mark não tem mandado pra abordar ninguém aqui — só pra ver.",
-			"As sombras ao longo da parede escondem bem. O meio do beco, não.",
-		],
-		["", "", ""]
-	)
+	var lines: Array = [
+		"O endereço que o Lou — ou o Miko, depende de quem falou — soltou dá nesse beco atrás de um depósito fechado.",
+	]
+	if GameState.informant_warned:
+		cone_range = CONE_RANGE * ALERT_RANGE_MULT
+		guard_speed = GUARD_SPEED * ALERT_SPEED_MULT
+		lines.append("O vigia não para quieto, olha pra todo lado. Alguém avisou que a polícia andou perguntando — e eles mudaram a rotina.")
+	elif "rotina_vigia" in GameState.leads:
+		smoke_breaks = true
+		lines.append("Mark chega no horário que o informante deu. Dito e feito: de tempos em tempos o vigia para, acende um cigarro e fica virado pro muro.")
+	else:
+		lines.append("Tem um cara de vigia, ida e volta, lento, mas atento.")
+	lines.append("Mark não tem mandado pra abordar ninguém aqui — só pra ver. As sombras ao longo da parede escondem bem. O meio do beco, não.")
+	story.say(lines, ["", "", ""])
 
 
 func _build_alley() -> void:
@@ -238,13 +258,21 @@ func _move_player() -> void:
 
 
 func _update_guard(delta: float) -> void:
+	if _smoke_timer > 0.0:
+		_smoke_timer -= delta
+		return
 	var target := guard_to if guard_dir > 0 else guard_from
-	guard.position = guard.position.move_toward(target, GUARD_SPEED * delta)
+	guard.position = guard.position.move_toward(target, guard_speed * delta)
 	if guard.position.distance_to(target) < 4.0:
 		guard_dir *= -1
+		if smoke_breaks:
+			_smoke_timer = SMOKE_TIME
 
 
+## Fumando, fica virado pro muro de cima — o cone sai do caminho.
 func _guard_facing() -> Vector2:
+	if _smoke_timer > 0.0:
+		return Vector2.UP
 	return Vector2(guard_dir, 0.0)
 
 
@@ -255,7 +283,7 @@ func _check_spotted() -> void:
 		return
 	var to_player := player.position - guard.position
 	var dist := to_player.length()
-	if dist > CONE_RANGE:
+	if dist > cone_range:
 		return
 	var angle := _guard_facing().angle_to(to_player.normalized())
 	if absf(angle) <= CONE_HALF_ANGLE:
@@ -278,7 +306,10 @@ func _on_spotted() -> void:
 func _update_hud() -> void:
 	match _phase:
 		"sneak":
-			status_label.text = tr("Objetivo: avance pelas sombras sem ser visto.")
+			if _smoke_timer > 0.0:
+				status_label.text = tr("O vigia parou pra fumar, virado pro muro — agora!")
+			else:
+				status_label.text = tr("Objetivo: avance pelas sombras sem ser visto.")
 		"done":
 			status_label.text = tr("Fase 3 concluída.")
 		_:
@@ -293,12 +324,15 @@ func _draw() -> void:
 		var points := PackedVector2Array(
 			[
 				guard.position,
-				guard.position + facing.rotated(-CONE_HALF_ANGLE) * CONE_RANGE,
-				guard.position + facing.rotated(CONE_HALF_ANGLE) * CONE_RANGE,
+				guard.position + facing.rotated(-CONE_HALF_ANGLE) * cone_range,
+				guard.position + facing.rotated(CONE_HALF_ANGLE) * cone_range,
 			]
 		)
-		draw_colored_polygon(points, Color(0.9, 0.8, 0.2, 0.25))
+		var cone_alpha := 0.1 if _smoke_timer > 0.0 else 0.25
+		draw_colored_polygon(points, Color(0.9, 0.8, 0.2, cone_alpha))
 		draw_circle(guard.position, 14.0, Color(0.8, 0.3, 0.3))
+		if _smoke_timer > 0.0:
+			draw_circle(guard.position + Vector2(8, -14), 3.0, Color(1.0, 0.5, 0.1))
 	if vantage_zone:
 		draw_circle(vantage_zone.position, 40.0, Color(0.3, 0.7, 0.4, 0.3))
 	if player:
