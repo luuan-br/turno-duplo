@@ -7,6 +7,8 @@ extends TestCase
 
 func run() -> void:
 	await _guarda()
+	await _municao()
+	await _sandbox_tatico()
 	await _carro()
 	await _manche_toque_duplo()
 	await _interrogatorio()
@@ -117,6 +119,81 @@ func _guarda() -> void:
 	wall.position = Vector2(75, 0)
 	await wait(g.lose_sight_time + 0.6)
 	check("Guarda: sem linha de visão, sai do combate e procura", g.state != EnemyGuard.State.COMBAT, str(g.state))
+
+
+# ---------- munição ----------
+
+func _municao() -> void:
+	await _arena()
+	var player := TacticalPlayer.new()
+	scene.add_child(player)
+	var combat := CombatLayer.new()
+	scene.add_child(combat)
+	combat.setup(player)
+	player.controls_locked = false
+	player.can_shoot = true
+	player.reload_time = 0.3
+	var shots := [0]
+	player.fired.connect(func(_c, _f, _t): shots[0] += 1)
+	await frames(2)
+
+	check("Munição: sem set_ammo é infinita (missões que não usam o sistema)", not player.uses_ammo())
+	for i in 3:
+		await tap("shoot")
+	check("Munição: ...e atira sempre", shots[0] == 3)
+
+	shots[0] = 0
+	player.set_ammo(2, 1)
+	await tap("shoot")
+	check("Munição: cada tiro gasta uma bala do pente", player.mag == 1 and shots[0] == 1)
+	await tap("shoot")
+	check("Munição: pente vazio recarrega sozinho", player.mag == 0 and player.is_reloading())
+	await tap("shoot")
+	check("Munição: recarregando não atira", shots[0] == 2)
+	await wait(0.45)
+	check("Munição: recarga tira da reserva só o que cabe", player.mag == 1 and player.reserve == 0 and not player.is_reloading())
+	await tap("shoot")
+	var dry := [0]
+	player.dry_fired.connect(func(): dry[0] += 1)
+	await tap("shoot")
+	check("Munição: sem bala nenhuma o gatilho só dá clique", shots[0] == 3 and dry[0] == 1 and not player.is_reloading())
+
+	# Guarda derrubado larga a arma; passar por cima pega e já recarrega.
+	var pts: Array[Vector2] = [Vector2(300, 0)]
+	var g := combat.add_guard(pts, Vector2.LEFT)
+	await frames(2)
+	g.take_hit()
+	await frames(2)
+	check("Munição: guarda derrubado larga a arma", combat.drops.size() == 1)
+	player.position = Vector2(150, 0)
+	await frames(3)
+	check("Munição: longe dela não pega", combat.drops.size() == 1 and player.reserve == 0)
+	player.position = g.global_position
+	await frames(3)
+	check("Munição: passar por cima pega as balas", combat.drops.is_empty() and (player.reserve > 0 or player.is_reloading()))
+	await wait(0.45)
+	check("Munição: arma pega com o pente vazio já recarrega", player.mag == mini(2, combat.drop_ammo))
+
+	player.set_ammo(3, 5)
+	await tap("shoot")
+	await tap("reload")
+	check("Munição: RECARREGAR antes de esvaziar funciona", player.is_reloading())
+	await wait(0.45)
+	check("Munição: recarga manual completa o pente", player.mag == 3 and player.reserve == 4)
+	await tap("reload")
+	check("Munição: pente cheio não recarrega", not player.is_reloading())
+
+
+func _sandbox_tatico() -> void:
+	await load_scene("res://sandbox/tatico.tscn")
+	var p: TacticalPlayer = scene.player
+	check("Sandbox tático: piloto de munição ligado", p.uses_ammo() and p.mag == scene.MAG_SIZE and p.reserve == scene.SPARE_AMMO)
+	check("Sandbox tático: RECARREGAR escondido com pente cheio", not scene.reload_btn.visible)
+	await tap("shoot")
+	check("Sandbox tático: depois de um tiro, RECARREGAR aparece", scene.reload_btn.visible)
+	check("Sandbox tático: HUD mostra a munição", "Munição: %d/%d" % [p.mag, p.mag_size] in scene.health_label.text, scene.health_label.text)
+	await clear_guards(p, scene.combat)
+	check("Sandbox tático: cada guarda derrubado larga a arma", scene.combat.drops.size() == scene.combat.guards.size(), "%d armas" % scene.combat.drops.size())
 
 
 # ---------- carro ----------

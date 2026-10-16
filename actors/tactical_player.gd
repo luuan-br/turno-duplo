@@ -10,11 +10,15 @@ extends CharacterBody2D
 signal fired(collider: Object, from: Vector2, to: Vector2)
 signal hit_taken(vest_left: int)
 signal downed
+signal dry_fired
+signal reload_started
+signal reloaded
 
 const RADIUS := 14.0
 const NOISE_GUNSHOT := 550.0
 const NOISE_SPRINT_STEP := 170.0
 const SPRINT_STEP_INTERVAL := 0.35
+const NOISE_RELOAD := 120.0
 
 var speed_cautious := 90.0
 var speed_sprint := 170.0
@@ -24,6 +28,7 @@ var sprint_charge_decay := 2.0
 var aim_responsiveness := 16.0
 var fire_range := 900.0
 var body_color := Color(0.3, 0.6, 0.9)
+var reload_time := 1.4
 
 var controls_locked := true
 var can_shoot := false
@@ -35,11 +40,17 @@ var facing := Vector2.RIGHT
 var vest_hits := 0
 var vest_hp := 0
 var is_down := false
+## Munição (GDD Seção 8): `mag_size` 0 = infinita (Academia e missões que
+## ainda não usam o sistema). A missão liga com `set_ammo()`.
+var mag_size := 0
+var mag := 0
+var reserve := 0
 
 var aim_end := Vector2.ZERO
 var aim_on_target := false
 var _sprint_charge := 0.0
 var _step_timer := 0.0
+var _reload_timer := -1.0
 
 
 func _ready() -> void:
@@ -64,6 +75,46 @@ func set_vest(hits: int) -> void:
 	vest_hp = hits
 
 
+func set_ammo(size: int, spare: int) -> void:
+	mag_size = size
+	mag = size
+	reserve = spare
+	_reload_timer = -1.0
+
+
+func uses_ammo() -> bool:
+	return mag_size > 0
+
+
+func is_reloading() -> bool:
+	return _reload_timer >= 0.0
+
+
+func reload_progress() -> float:
+	return 1.0 - _reload_timer / reload_time if is_reloading() else 0.0
+
+
+func can_reload() -> bool:
+	return uses_ammo() and not is_reloading() and mag < mag_size and reserve > 0
+
+
+func start_reload() -> void:
+	if not can_reload():
+		return
+	_reload_timer = reload_time
+	# Barulho baixo: recarregar colado num guarda chama atenção.
+	if combat:
+		combat.noise(global_position, NOISE_RELOAD)
+	reload_started.emit()
+
+
+## Balas da arma de um suspeito caído. Pente vazio já recarrega na hora.
+func add_ammo(amount: int) -> void:
+	reserve += amount
+	if mag == 0:
+		start_reload()
+
+
 func is_sprinting() -> bool:
 	return _sprint_charge >= sprint_charge_time
 
@@ -85,6 +136,15 @@ func _process(delta: float) -> void:
 	# Consome sempre, mesmo travado — senão um toque durante o diálogo
 	# dispara sozinho no instante em que o controle volta.
 	var pressed_shoot := InputBridge.consume_just_pressed("shoot")
+	var pressed_reload := InputBridge.consume_just_pressed("reload")
+	if is_reloading() and not is_down:
+		_reload_timer -= delta
+		if _reload_timer <= 0.0:
+			_reload_timer = -1.0
+			var n := mini(mag_size - mag, reserve)
+			mag += n
+			reserve -= n
+			reloaded.emit()
 	if is_down or controls_locked:
 		velocity = Vector2.ZERO
 		queue_redraw()
@@ -93,8 +153,10 @@ func _process(delta: float) -> void:
 	_update_facing(delta)
 	if can_shoot:
 		_update_aim()
+		if pressed_reload:
+			start_reload()
 		if pressed_shoot:
-			_fire()
+			_try_fire()
 	queue_redraw()
 
 
@@ -146,6 +208,22 @@ func _update_aim() -> void:
 		aim_on_target = r.collider is EnemyGuard and not r.collider.is_dead()
 
 
+func _try_fire() -> void:
+	if not uses_ammo():
+		_fire()
+		return
+	if is_reloading():
+		return
+	if mag <= 0:
+		dry_fired.emit()
+		start_reload()
+		return
+	mag -= 1
+	_fire()
+	if mag == 0:
+		start_reload()
+
+
 func _fire() -> void:
 	var r := _cast()
 	var end: Vector2 = r.position if not r.is_empty() else global_position + facing * fire_range
@@ -174,6 +252,8 @@ func _draw() -> void:
 		draw_circle(local_end, 5.0, c)
 	else:
 		draw_line(Vector2.ZERO, facing * (RADIUS + 24.0), Color.WHITE, 3.0)
+	if is_reloading():
+		draw_arc(Vector2.ZERO, RADIUS + 11.0, -PI * 0.5, -PI * 0.5 + TAU * reload_progress(), 24, Color(1.0, 0.6, 0.2), 3.0)
 	if _sprint_charge > 0.05 and _sprint_charge < sprint_charge_time:
 		var frac := _sprint_charge / sprint_charge_time
 		draw_arc(Vector2.ZERO, RADIUS + 7.0, -PI * 0.5, -PI * 0.5 + TAU * frac, 24, Color.YELLOW, 3.0)

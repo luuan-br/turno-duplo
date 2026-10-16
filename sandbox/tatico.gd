@@ -23,6 +23,11 @@ const NOISE_CRATE := 380.0
 const NOISE_LAMP := 250.0
 const NOISE_BREACH_LOUD := 450.0
 const NOISE_DOOR_OPEN := 80.0
+## Piloto de munição: pouca de propósito, pra o jogador sentir o sistema
+## (errar e distrair gastam bala; sem bala, pegar a arma de um guarda).
+const MAG_SIZE := 6
+const SPARE_AMMO := 6
+const DROP_AMMO := 6
 
 var player: TacticalPlayer
 var combat: CombatLayer
@@ -49,6 +54,7 @@ var breach_btn: Control
 var open_btn: Control
 var pickup_btn: Control
 var fire_btn: Control
+var reload_btn: Control
 
 
 func _ready() -> void:
@@ -163,11 +169,16 @@ func _build_player() -> void:
 	player.controls_locked = false
 	player.can_shoot = true
 	player.extra_exclude = [vest_item.get_rid()]
+	player.set_ammo(MAG_SIZE, SPARE_AMMO)
+	player.dry_fired.connect(_on_dry_fired)
+	player.reload_started.connect(func(): _toast("Recarregando... (faz um pouco de barulho)"))
 	add_child(player)
 	combat.setup(player)
 	player.fired.connect(_on_player_fired)
 	player.hit_taken.connect(_on_hit_taken)
 	combat.player_downed.connect(_on_player_downed)
+	combat.drop_ammo = DROP_AMMO
+	combat.weapon_picked.connect(func(n): _toast("Pegou a arma do guarda: +%d balas." % n))
 
 
 ## Dois guardas: um vigia a lateral direita (de cima pra baixo), outro a
@@ -246,6 +257,13 @@ func _build_controls() -> void:
 	fire_btn = _corner_button("shoot", "ATIRAR", 30, 30, 100, 100)
 	layer.add_child(fire_btn)
 
+	# Menor e com vão de ~18px até o ATIRAR: a área de toque é o círculo
+	# inteiro, e encostado nele os dois disputariam o mesmo dedo.
+	reload_btn = _corner_button("reload", "RECARGA", 44, 148, 72, 72)
+	reload_btn.radius = 36.0
+	reload_btn.visible = false
+	layer.add_child(reload_btn)
+
 
 func _corner_button(action: String, label: String, right: float, bottom: float, w: float, h: float) -> Control:
 	var btn := Control.new()
@@ -269,6 +287,7 @@ func _process(delta: float) -> void:
 	if not player.is_down:
 		_update_doors()
 		_update_vest_pickup()
+	reload_btn.visible = player.can_reload() and not player.is_down
 	combat.set_dark(not lamp_on)
 	_update_hud(delta)
 	queue_redraw()
@@ -330,6 +349,13 @@ func _on_player_fired(collider: Object, _from: Vector2, _to: Vector2) -> void:
 		_toast("Acertou a parede — o tiro não atravessa.")
 
 
+func _on_dry_fired() -> void:
+	if player.reserve > 0:
+		_toast("Pente vazio — recarregando.")
+	else:
+		_toast("SEM MUNIÇÃO! Pegue a arma de um guarda caído (anel amarelo).")
+
+
 func _on_hit_taken(vest_left: int) -> void:
 	if vest_left > 0:
 		_toast("O colete segurou o tiro! Aguenta mais %d." % vest_left)
@@ -354,12 +380,15 @@ func _update_hud(delta: float) -> void:
 		health_label.text = "Colete: %d/%d" % [player.vest_hp, player.vest_hits]
 	else:
 		health_label.text = "Sem colete — um tiro derruba"
+	if player.uses_ammo() and not player.is_down:
+		var ammo := "RECARREGANDO" if player.is_reloading() else "%d/%d" % [player.mag, player.mag_size]
+		health_label.text += "\nMunição: %s   Reserva: %d" % [ammo, player.reserve]
 
 	if _toast_timer > 0.0:
 		_toast_timer -= delta
 		return
 	var state := "SPRINT (barulhento)" if player.is_sprinting() else "cauteloso"
-	status_label.text = "Estado: %s | Guardas: %d vivos, %d te vendo\nEsquerda move. Direita mira — TOQUE DUAS VEZES no lado direito pra atirar (ou ATIRAR).\nGuardas só veem dentro do cone e não atravessam parede. Sprint e tiro fazem barulho: eles vão investigar.\nApague a luminária (escuro = visão curta), quebre a caixa pra distrair, pegue o colete à esquerda." % [state, combat.alive_count(), combat.seeing_count()]
+	status_label.text = "Estado: %s | Guardas: %d vivos, %d te vendo\nEsquerda move. Direita mira — TOQUE DUAS VEZES no lado direito pra atirar (ou ATIRAR).\nGuardas só veem dentro do cone e não atravessam parede. Sprint e tiro fazem barulho: eles vão investigar.\nApague a luminária (escuro = visão curta), quebre a caixa pra distrair, pegue o colete à esquerda.\nMunição contada: errar e distrair gastam bala. Guarda caído larga a arma — passe por cima pra pegar." % [state, combat.alive_count(), combat.seeing_count()]
 
 
 func _draw() -> void:

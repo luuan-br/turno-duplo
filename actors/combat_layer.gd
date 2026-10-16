@@ -11,14 +11,21 @@ extends Node2D
 
 signal player_downed
 signal all_guards_down
+signal weapon_picked(amount: int)
 
 const NOISE_RING_TIME := 0.6
 const SHOT_LINE_TIME := 0.25
 const RESTART_DELAY := 1.8
+const PICKUP_RADIUS := 28.0
 
 var player: TacticalPlayer
 var guards: Array[EnemyGuard] = []
 var active := false
+## Munição (GDD Seção 8): guarda derrubado larga a arma com essas balas;
+## passar por cima pega. Só vale se o jogador usa munição (`set_ammo`).
+var drop_ammo := 6
+
+var drops: Array[Dictionary] = []
 
 var _rings: Array[Dictionary] = []
 var _lines: Array[Dictionary] = []
@@ -41,7 +48,7 @@ func add_guard(points: Array[Vector2], look := Vector2.ZERO) -> EnemyGuard:
 		g.facing = look.normalized()
 	g.target = player
 	g.fired.connect(_on_guard_fired)
-	g.died.connect(_on_guard_died)
+	g.died.connect(_on_guard_died.bind(g))
 	g.process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
 	add_child(g)
 	guards.append(g)
@@ -100,7 +107,9 @@ func _on_guard_fired(from: Vector2, to: Vector2, hit: bool) -> void:
 		player.take_shot()
 
 
-func _on_guard_died() -> void:
+func _on_guard_died(g: EnemyGuard) -> void:
+	if player and player.uses_ammo() and drop_ammo > 0:
+		drops.append({"pos": g.global_position, "ammo": drop_ammo})
 	if not _all_down_sent and alive_count() == 0:
 		_all_down_sent = true
 		all_guards_down.emit()
@@ -113,6 +122,7 @@ func _on_player_downed() -> void:
 
 
 func _process(delta: float) -> void:
+	_update_drops()
 	for arr in [_rings, _lines]:
 		for i in range(arr.size() - 1, -1, -1):
 			arr[i]["timer"] -= delta
@@ -121,7 +131,24 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+func _update_drops() -> void:
+	if not player or player.is_down or player.controls_locked:
+		return
+	for i in range(drops.size() - 1, -1, -1):
+		if player.global_position.distance_to(drops[i]["pos"]) <= PICKUP_RADIUS:
+			var amount: int = drops[i]["ammo"]
+			drops.remove_at(i)
+			player.add_ammo(amount)
+			weapon_picked.emit(amount)
+
+
 func _draw() -> void:
+	for d in drops:
+		var p: Vector2 = d["pos"]
+		draw_rect(Rect2(p + Vector2(-9, -3), Vector2(18, 6)), Color(0.85, 0.85, 0.75))
+		draw_rect(Rect2(p + Vector2(-9, 0), Vector2(5, 8)), Color(0.85, 0.85, 0.75))
+		# Anel maior que o corpo do guarda (desenhado por cima) — fica visível.
+		draw_arc(p, 22.0, 0.0, TAU, 24, Color(1.0, 0.9, 0.3, 0.7), 2.5)
 	for n in _rings:
 		var frac: float = 1.0 - n["timer"] / NOISE_RING_TIME
 		draw_arc(n["pos"], n["radius"] * frac, 0.0, TAU, 48, Color(1.0, 1.0, 1.0, 0.35 * (1.0 - frac)), 2.0)
