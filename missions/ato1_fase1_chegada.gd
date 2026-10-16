@@ -328,6 +328,7 @@ func _action_button(action: String, label: String, right: float, bottom: float, 
 	btn.set_script(load("res://ui/contextual_button.gd"))
 	btn.action_name = action
 	btn.label_text = label
+	btn.layout_slot = ControlLayout.slot_for_action(action)
 	btn.anchor_left = 1.0
 	btn.anchor_right = 1.0
 	btn.anchor_top = 1.0

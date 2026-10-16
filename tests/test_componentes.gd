@@ -11,6 +11,8 @@ func run() -> void:
 	await _sandbox_tatico()
 	await _carro()
 	await _manche_toque_duplo()
+	await _disposicao_controles()
+	await _editor_controles()
 	await _interrogatorio()
 
 
@@ -290,6 +292,119 @@ func _manche_toque_duplo() -> void:
 	_touch(stick, p, true)
 	check("Manche: dois toques espaçados demais não atiram", not ib().consume_just_pressed("shoot"))
 	_touch(stick, p, false)
+
+
+# ---------- disposição configurável dos botões ----------
+
+func _layout() -> Node:
+	return get_node("/root/ControlLayout")
+
+
+## Centro do botão medido do canto inferior direito, como o ControlLayout.
+func _btn_center(btn: Control) -> Vector2:
+	return -Vector2((btn.offset_left + btn.offset_right) * 0.5, (btn.offset_top + btn.offset_bottom) * 0.5)
+
+
+func _disposicao_controles() -> void:
+	var cl := _layout()
+	cl.reset_defaults()
+	for scr in [Vector2(960, 540), Vector2(1170, 540)]:
+		for m in ["pe", "carro"]:
+			check("Controles: padrão de fábrica sem botão encostado (%s, %dx%d)" % [m, scr.x, scr.y], cl.problems(m, scr).is_empty(), str(cl.problems(m, scr)))
+
+	# Padrão = a disposição validada no celular (antes era fixa em cada missão).
+	await load_scene("res://missions/ato4_fase1_infiltrar.tscn")
+	var b: Control = scene.fire_btn
+	check("Controles: ATIRAR da missão no lugar validado (30 da direita, 180 de baixo, 100)", is_equal_approx(b.offset_right, -30.0) and is_equal_approx(b.offset_bottom, -180.0) and is_equal_approx(b.radius, 50.0), "%s %s %s" % [b.offset_right, b.offset_bottom, b.radius])
+
+	# Mudou o lugar: toda missão abre com o botão lá.
+	cl.set_placement("acao_principal", Vector2(400, 260), 130.0)
+	cl.set_placement("carro_extra", Vector2(300, 120), 90.0)
+	await load_scene("res://missions/ato4_fase1_infiltrar.tscn")
+	check("Controles: ATIRAR segue a disposição do jogador", _btn_center(scene.fire_btn).is_equal_approx(Vector2(400, 260)) and is_equal_approx(scene.fire_btn.radius, 65.0))
+	check("Controles: ARROMBAR divide o lugar do ATIRAR (botão principal)", _btn_center(scene.breach_btn).is_equal_approx(Vector2(400, 260)))
+	check("Controles: RECARGA fica onde estava (lugar próprio)", _btn_center(scene.reload_btn).is_equal_approx(cl.SLOTS["acao_secundaria"]["center"]))
+	await load_scene("res://missions/ato4_fase2_perseguicao.tscn")
+	check("Controles: tiro no pneu (dirigindo) segue o lugar extra do carro, não o ATIRAR a pé", _btn_center(scene.fire_btn).is_equal_approx(Vector2(300, 120)))
+	await load_scene("res://missions/ato1_fase2_abordagem.tscn")
+	check("Controles: vale também na Academia", _btn_center(scene.fire_btn).is_equal_approx(Vector2(400, 260)))
+
+	# Salvar e carregar (arquivo de teste — ver run_tests.gd).
+	cl.save_layout()
+	cl.reset_defaults()
+	cl.load_layout()
+	check("Controles: disposição salva volta ao abrir o jogo", cl.center_of("acao_principal").is_equal_approx(Vector2(400, 260)) and is_equal_approx(cl.size_of("carro_extra"), 90.0))
+
+	cl.set_placement("acao_secundaria", Vector2(400, 200), 72.0)
+	check("Controles: botões encostados são detectados", not cl.problems("pe", Vector2(960, 540)).is_empty())
+	cl.set_placement("acao_secundaria", Vector2(960 - 70, 35), 72.0)
+	check("Controles: botão em cima do \"< Menu\" é detectado", cl.problems("pe", Vector2(960, 540)).size() == 1)
+	cl.set_placement("acao_secundaria", Vector2(80, 110), 500.0)
+	check("Controles: tamanho fica entre o mínimo e o máximo", is_equal_approx(cl.size_of("acao_secundaria"), cl.SIZE_MAX))
+	cl.reset_defaults()
+	cl.save_layout()
+
+
+func _mouse(pos: Vector2, pressed: bool) -> void:
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.position = pos
+	ev.pressed = pressed
+	scene._on_canvas_input(ev)
+
+
+func _mouse_move(pos: Vector2) -> void:
+	var ev := InputEventMouseMotion.new()
+	ev.position = pos
+	scene._on_canvas_input(ev)
+
+
+func _editor_controles() -> void:
+	var cl := _layout()
+	cl.reset_defaults()
+	await load_scene("res://ui/controls_editor.tscn")
+	check("Editor: abre na aba A pé com o botão principal escolhido", scene.mode == "pe" and scene.selected == "acao_principal")
+
+	var start: Vector2 = scene.screen_pos("acao_secundaria")
+	_mouse(start, true)
+	_mouse_move(start + Vector2(-200, 0))
+	_mouse(start + Vector2(-200, 0), false)
+	check("Editor: tocar e arrastar escolhe e move o botão", scene.selected == "acao_secundaria" and scene.screen_pos("acao_secundaria").is_equal_approx(start + Vector2(-200, 0)))
+
+	var big: float = cl.size_of("acao_secundaria")
+	scene._resize(scene.SIZE_STEP)
+	check("Editor: + aumenta o tamanho", is_equal_approx(cl.size_of("acao_secundaria"), big + scene.SIZE_STEP))
+
+	_mouse(scene.screen_pos("acao_secundaria"), true)
+	_mouse_move(Vector2(scene.screen_pos("acao_secundaria").x, -500))
+	_mouse(Vector2.ZERO, false)
+	check("Editor: não deixa subir na barra de cima", scene.screen_pos("acao_secundaria").y >= scene.TOOLBAR_H + cl.size_of("acao_secundaria") * 0.5 - 0.5)
+
+	# Encostado no ATIRAR: não salva.
+	var target: Vector2 = scene.screen_pos("acao_principal") + Vector2(-30, 0)
+	_mouse(scene.screen_pos("acao_secundaria"), true)
+	_mouse_move(target)
+	_mouse(target, false)
+	scene._on_save()
+	cl.load_layout()
+	check("Editor: com botões encostados, Salvar recusa e avisa", cl.center_of("acao_secundaria").is_equal_approx(cl.SLOTS["acao_secundaria"]["center"]) and "encostados" in scene.msg_label.text, scene.msg_label.text)
+
+	# Afastado: salva.
+	await load_scene("res://ui/controls_editor.tscn")
+	var p2: Vector2 = scene.screen_pos("acao_secundaria") + Vector2(-150, -20)
+	_mouse(scene.screen_pos("acao_secundaria"), true)
+	_mouse_move(p2)
+	_mouse(p2, false)
+	scene._on_save()
+	cl.reset_defaults()
+	cl.load_layout()
+	check("Editor: Salvar grava a disposição", cl.is_custom() and scene._screen() - cl.center_of("acao_secundaria") == p2, scene.msg_label.text)
+
+	scene._on_reset()
+	check("Editor: Restaurar padrão volta à disposição de fábrica", not cl.is_custom())
+	cl.save_layout()
+	scene._set_mode("carro")
+	check("Editor: aba Carro mostra os 3 botões do carro", scene.selected == "carro_acelerar" and cl.slots_for_mode("carro").size() == 3)
 
 
 # ---------- interrogatório (piloto do sandbox) ----------

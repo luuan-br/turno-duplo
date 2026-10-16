@@ -108,6 +108,17 @@ func start_reload() -> void:
 	reload_started.emit()
 
 
+## Linha de HUD da munição (vazia sem o sistema ligado).
+func ammo_text() -> String:
+	if not uses_ammo():
+		return ""
+	if is_reloading():
+		return tr("Munição: recarregando...")
+	if mag == 0 and reserve == 0:
+		return tr("SEM MUNIÇÃO — pegue a arma de um guarda caído (anel amarelo)")
+	return tr("Munição: %d/%d   Reserva: %d") % [mag, mag_size, reserve]
+
+
 ## Balas da arma de um suspeito caído. Pente vazio já recarrega na hora.
 func add_ammo(amount: int) -> void:
 	reserve += amount

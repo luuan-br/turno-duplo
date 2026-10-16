@@ -13,6 +13,10 @@ const ROOM_ORIGIN := Vector2(80.0, 60.0)
 const WALL_THICK := 20.0
 const INTERACT_DIST := 55.0
 const VEST_HITS := 2
+## Munição — Ato 4: equipamento de ação (GDD Seção 8).
+const MAG_SIZE := 10
+const SPARE_AMMO := 10
+const DROP_AMMO := 8
 const CORRIDOR_SIZE := Vector2(480.0, 140.0)
 const KESSLER_FLEE_SPEED := 55.0
 const WALL_COLOR := Color(0.18, 0.16, 0.22)
@@ -26,6 +30,7 @@ var _kessler_caught := false
 var kessler_target: Vector2
 
 var fire_btn: Control
+var reload_btn: Control
 var detain_btn: Control
 var story: Control
 var status_label: Label
@@ -117,8 +122,10 @@ func _build_player() -> void:
 	player = TacticalPlayer.new()
 	player.position = ROOM_ORIGIN + Vector2(60, ROOM_SIZE.y - 60)
 	player.set_vest(VEST_HITS)
+	player.set_ammo(MAG_SIZE, SPARE_AMMO)
 	add_child(player)
 	combat.setup(player)
+	combat.drop_ammo = DROP_AMMO
 	combat.player_downed.connect(_on_player_downed)
 	combat.all_guards_down.connect(_on_all_guards_down)
 
@@ -198,6 +205,13 @@ func _build_controls() -> void:
 	fire_btn.visible = false
 	layer.add_child(fire_btn)
 
+	# Abaixo do ATIRAR, menor e com vão: a área de toque é o círculo
+	# inteiro — encostados, os dois disputariam o mesmo dedo.
+	reload_btn = _action_button("reload", tr("RECARGA"), 44.0, 74.0, 72.0, 72.0)
+	reload_btn.radius = 36.0
+	reload_btn.visible = false
+	layer.add_child(reload_btn)
+
 	detain_btn = _action_button("detain", tr("DETER"), 30.0, 180.0, 100.0, 100.0)
 	detain_btn.show_hold_progress = true
 	detain_btn.visible = false
@@ -209,6 +223,7 @@ func _action_button(action: String, label: String, right: float, bottom: float, 
 	btn.set_script(load("res://ui/contextual_button.gd"))
 	btn.action_name = action
 	btn.label_text = label
+	btn.layout_slot = ControlLayout.slot_for_action(action)
 	btn.anchor_left = 1.0
 	btn.anchor_right = 1.0
 	btn.anchor_top = 1.0
@@ -296,6 +311,7 @@ func _process(delta: float) -> void:
 	player.controls_locked = _controls_locked
 	player.can_shoot = _phase == "fight"
 	fire_btn.visible = _phase == "fight" and not _controls_locked
+	reload_btn.visible = fire_btn.visible and player.can_reload()
 	_check_catch()
 	if _kessler_fleeing and not _kessler_caught:
 		kessler_marker.position = kessler_marker.position.move_toward(kessler_target, KESSLER_FLEE_SPEED * delta)
@@ -306,7 +322,7 @@ func _process(delta: float) -> void:
 func _update_hud() -> void:
 	match _phase:
 		"fight":
-			status_label.text = tr("Derrube a escolta do Kessler: %d restantes. Os dois do fundo não saem do lado dele.") % combat.alive_count() + "   " + tr("Colete: %d/%d") % [player.vest_hp, player.vest_hits]
+			status_label.text = tr("Derrube a escolta do Kessler: %d restantes. Os dois do fundo não saem do lado dele.") % combat.alive_count() + "   " + tr("Colete: %d/%d") % [player.vest_hp, player.vest_hits] + "\n" + player.ammo_text()
 		"corridor":
 			status_label.text = tr("Objetivo: alcance o Kessler antes que ele chegue na saída e segure DETER.")
 		"down":

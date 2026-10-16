@@ -6,6 +6,7 @@ extends Control
 ## Cada entrada: [texto do botão, caminho da cena]. Adicionar missão
 ## nova = acrescentar uma linha aqui, nada mais.
 const ENTRIES := [
+	["Configurar controles (posição e tamanho dos botões)", "res://ui/controls_editor.tscn"],
 	["Missão: Ato 1, Fase 1 — Chegada", "res://missions/ato1_fase1_chegada.tscn"],
 	["Missão: Ato 1, Fase 2 — Abordagem Tática", "res://missions/ato1_fase2_abordagem.tscn"],
 	["Missão: Ato 1, Fase 3 — Direção Defensiva", "res://missions/ato1_fase3_direcao.tscn"],

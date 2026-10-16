@@ -15,6 +15,10 @@ const GATE_GAP := 90.0
 const PARTNER_FOLLOW_SPEED := 85.0
 const PARTNER_FOLLOW_DIST := 50.0
 const VEST_HITS := 2
+## Munição — Ato 4: equipamento de ação (GDD Seção 8).
+const MAG_SIZE := 10
+const SPARE_AMMO := 10
+const DROP_AMMO := 8
 const NOISE_BREACH_LOUD := 450.0
 const CRATE_COLOR := Color(0.42, 0.3, 0.18)
 
@@ -28,6 +32,7 @@ var gate_body: StaticBody2D
 var gate_open := false
 
 var fire_btn: Control
+var reload_btn: Control
 var breach_btn: Control
 var story: Control
 var status_label: Label
@@ -117,8 +122,10 @@ func _build_player() -> void:
 	player = TacticalPlayer.new()
 	player.position = YARD_ORIGIN + Vector2(60, YARD_SIZE.y - 70)
 	player.set_vest(VEST_HITS)
+	player.set_ammo(MAG_SIZE, SPARE_AMMO)
 	add_child(player)
 	combat.setup(player)
+	combat.drop_ammo = DROP_AMMO
 	combat.player_downed.connect(_on_player_downed)
 	combat.all_guards_down.connect(_on_all_guards_down)
 
@@ -214,12 +221,20 @@ func _build_controls() -> void:
 	fire_btn.visible = false
 	layer.add_child(fire_btn)
 
+	# Abaixo do ATIRAR, menor e com vão: a área de toque é o círculo
+	# inteiro — encostados, os dois disputariam o mesmo dedo.
+	reload_btn = _action_button("reload", tr("RECARGA"), 44.0, 74.0, 72.0, 72.0)
+	reload_btn.radius = 36.0
+	reload_btn.visible = false
+	layer.add_child(reload_btn)
+
 
 func _action_button(action: String, label: String, right: float, bottom: float, w: float, h: float) -> Control:
 	var btn := Control.new()
 	btn.set_script(load("res://ui/contextual_button.gd"))
 	btn.action_name = action
 	btn.label_text = label
+	btn.layout_slot = ControlLayout.slot_for_action(action)
 	btn.anchor_left = 1.0
 	btn.anchor_right = 1.0
 	btn.anchor_top = 1.0
@@ -315,6 +330,7 @@ func _process(delta: float) -> void:
 	player.controls_locked = _controls_locked
 	player.can_shoot = _phase == "fight"
 	fire_btn.visible = _phase == "fight" and not _controls_locked
+	reload_btn.visible = fire_btn.visible and player.can_reload()
 	_update_gate()
 	_update_theo(delta)
 	_update_hud()
@@ -330,7 +346,7 @@ func _update_theo(delta: float) -> void:
 
 
 func _vest_text() -> String:
-	return tr("Colete: %d/%d") % [player.vest_hp, player.vest_hits]
+	return tr("Colete: %d/%d") % [player.vest_hp, player.vest_hits] + "\n" + player.ammo_text()
 
 
 func _update_hud() -> void:

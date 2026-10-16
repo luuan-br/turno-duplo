@@ -134,9 +134,12 @@ func _build_controls() -> void:
 	stick.anchor_bottom = 1.0
 	layer.add_child(stick)
 
-	layer.add_child(_corner_button("accelerate", "ACELERAR", 30, 30, 110, 110))
-	layer.add_child(_corner_button("brake", "FREAR", 160, 40, 100, 100))
-	layer.add_child(_corner_button("handbrake", "FREIO DE\nMÃO / PIT", 30, 160, 110, 110))
+	# Seguem a disposição configurável (ControlLayout), como nas missões.
+	# O tiro no pneu fica fixo: aqui convive com o freio de mão, que nas
+	# missões ocupa o mesmo lugar "extra".
+	for b in [_corner_button("accelerate", "ACELERAR", 30, 30, 110, 110), _corner_button("brake", "FREAR", 160, 40, 100, 100), _corner_button("handbrake", "FREIO DE\nMÃO / PIT", 30, 160, 110, 110)]:
+		b.layout_slot = ControlLayout.slot_for_action(b.action_name)
+		layer.add_child(b)
 
 	shoot_btn = _corner_button("shoot", "ATIRAR\nNO PNEU", 280, 30, 90, 90)
 	shoot_btn.visible = false

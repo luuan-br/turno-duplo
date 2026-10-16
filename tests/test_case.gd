@@ -11,6 +11,7 @@ extends Node
 
 var results: Array[Dictionary] = []
 var scene: Node
+var _picks := 0
 
 
 func run() -> void:
@@ -187,6 +188,22 @@ func clear_guards(player: TacticalPlayer, combat: CombatLayer) -> void:
 		if not g.is_dead():
 			await shoot_guard(player, g)
 	await frames(2)
+
+
+## Começo do combate: munição do ato ligada, pente cheio, RECARGA escondido.
+func expect_ammo(label: String, mag: int, spare: int) -> void:
+	var p: TacticalPlayer = scene.player
+	check(label + ": munição do ato (%d no pente, %d de reserva)" % [mag, spare], p.uses_ammo() and p.mag_size == mag and p.mag == mag and p.reserve == spare, "%d/%d +%d" % [p.mag, p.mag_size, p.reserve])
+	check(label + ": RECARGA escondido com pente cheio", not scene.reload_btn.visible)
+	_picks = 0
+	scene.combat.weapon_picked.connect(func(_n): _picks += 1)
+
+
+## Depois de derrubar todos: cada guarda largou a arma. `clear_guards` pode
+## encostar o Mark em cima da arma de um anterior — essas contam como pegas.
+func expect_drops(label: String) -> void:
+	var c: CombatLayer = scene.combat
+	check(label + ": cada guarda derrubado largou a arma", c.drops.size() + _picks == c.guards.size(), "%d no chão, %d pegas" % [c.drops.size(), _picks])
 
 
 # ---------- fim de fase ----------

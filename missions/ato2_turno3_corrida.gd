@@ -184,6 +184,7 @@ func _build_controls() -> void:
 	catch_btn.set_script(load("res://ui/contextual_button.gd"))
 	catch_btn.action_name = "catch"
 	catch_btn.label_text = tr("ALGEMAR")
+	catch_btn.layout_slot = "acao_principal"
 	catch_btn.anchor_left = 1.0
 	catch_btn.anchor_right = 1.0
 	catch_btn.anchor_top = 1.0

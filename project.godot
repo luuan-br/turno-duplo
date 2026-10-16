@@ -20,6 +20,7 @@ boot_splash/bg_color=Color(0.05, 0.05, 0.07, 1)
 InputBridge="*res://autoload/input_bridge.gd"
 GameState="*res://autoload/game_state.gd"
 MissionFlow="*res://autoload/mission_flow.gd"
+ControlLayout="*res://autoload/control_layout.gd"
 
 [display]
 

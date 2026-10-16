@@ -159,6 +159,7 @@ func _build_controls() -> void:
 	reactivate_btn.set_script(load("res://ui/contextual_button.gd"))
 	reactivate_btn.action_name = "reactivate"
 	reactivate_btn.label_text = tr("REATIVAR")
+	reactivate_btn.layout_slot = "acao_principal"
 	reactivate_btn.anchor_left = 1.0
 	reactivate_btn.anchor_right = 1.0
 	reactivate_btn.anchor_top = 1.0

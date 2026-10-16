@@ -12,6 +12,10 @@ const ROOM_ORIGIN := Vector2(80.0, 60.0)
 const WALL_THICK := 20.0
 const INTERACT_DIST := 55.0
 const VEST_HITS := 2
+## Munição — Ato 4: equipamento de ação (GDD Seção 8).
+const MAG_SIZE := 10
+const SPARE_AMMO := 10
+const DROP_AMMO := 8
 const WALL_COLOR := Color(0.26, 0.22, 0.24)
 const FURNITURE_COLOR := Color(0.36, 0.28, 0.3)
 
@@ -22,6 +26,7 @@ var family_obj: Area2D
 var _rescued := false
 
 var fire_btn: Control
+var reload_btn: Control
 var rescue_btn: Control
 var story: Control
 var status_label: Label
@@ -105,11 +110,13 @@ func _build_player() -> void:
 	player = TacticalPlayer.new()
 	player.position = ROOM_ORIGIN + Vector2(60, ROOM_SIZE.y - 70)
 	player.set_vest(VEST_HITS)
+	player.set_ammo(MAG_SIZE, SPARE_AMMO)
 	# Tiro que passa do sequestrador não "acerta" a família — gray box, sem
 	# sistema de dano a civil aqui.
 	player.extra_exclude = [family_obj.get_rid()]
 	add_child(player)
 	combat.setup(player)
+	combat.drop_ammo = DROP_AMMO
 	combat.player_downed.connect(_on_player_downed)
 	combat.all_guards_down.connect(_on_all_guards_down)
 
@@ -182,6 +189,13 @@ func _build_controls() -> void:
 	fire_btn.visible = false
 	layer.add_child(fire_btn)
 
+	# Abaixo do ATIRAR, menor e com vão: a área de toque é o círculo
+	# inteiro — encostados, os dois disputariam o mesmo dedo.
+	reload_btn = _action_button("reload", tr("RECARGA"), 44.0, 74.0, 72.0, 72.0)
+	reload_btn.radius = 36.0
+	reload_btn.visible = false
+	layer.add_child(reload_btn)
+
 	rescue_btn = _action_button("rescue", tr("LIBERTAR"), 30.0, 180.0, 100.0, 100.0)
 	rescue_btn.show_hold_progress = true
 	rescue_btn.visible = false
@@ -193,6 +207,7 @@ func _action_button(action: String, label: String, right: float, bottom: float, 
 	btn.set_script(load("res://ui/contextual_button.gd"))
 	btn.action_name = action
 	btn.label_text = label
+	btn.layout_slot = ControlLayout.slot_for_action(action)
 	btn.anchor_left = 1.0
 	btn.anchor_right = 1.0
 	btn.anchor_top = 1.0
@@ -276,6 +291,7 @@ func _process(_delta: float) -> void:
 	player.controls_locked = _controls_locked
 	player.can_shoot = _phase == "fight"
 	fire_btn.visible = _phase == "fight" and not _controls_locked
+	reload_btn.visible = fire_btn.visible and player.can_reload()
 	_check_rescue()
 	_update_hud()
 	queue_redraw()
@@ -284,7 +300,7 @@ func _process(_delta: float) -> void:
 func _update_hud() -> void:
 	match _phase:
 		"fight":
-			status_label.text = tr("Tire os sequestradores de casa: %d restantes. O do fundo vigia a passagem.") % combat.alive_count() + "   " + tr("Colete: %d/%d") % [player.vest_hp, player.vest_hits]
+			status_label.text = tr("Tire os sequestradores de casa: %d restantes. O do fundo vigia a passagem.") % combat.alive_count() + "   " + tr("Colete: %d/%d") % [player.vest_hp, player.vest_hits] + "\n" + player.ammo_text()
 		"rescue":
 			status_label.text = tr("Objetivo: chegue até a Sarah e a Emma e segure LIBERTAR.")
 		"down":

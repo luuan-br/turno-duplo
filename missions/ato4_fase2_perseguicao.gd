@@ -178,6 +178,8 @@ func _build_controls() -> void:
 	brake_btn = _corner_button("brake", tr("FREAR"), 160, 40, 100, 100)
 	layer.add_child(brake_btn)
 	fire_btn = _corner_button("shoot", tr("ATIRAR\nNO PNEU"), 30, 160, 110, 110)
+	# Tiro dirigindo fica no lugar "extra" do carro, não no ATIRAR a pé.
+	fire_btn.layout_slot = "carro_extra"
 	fire_btn.visible = false
 	layer.add_child(fire_btn)
 
@@ -187,6 +189,7 @@ func _corner_button(action: String, label: String, right: float, bottom: float, 
 	btn.set_script(load("res://ui/contextual_button.gd"))
 	btn.action_name = action
 	btn.label_text = label
+	btn.layout_slot = ControlLayout.slot_for_action(action)
 	btn.anchor_left = 1.0
 	btn.anchor_right = 1.0
 	btn.anchor_top = 1.0

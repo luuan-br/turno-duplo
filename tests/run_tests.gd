@@ -21,6 +21,12 @@ func _main() -> void:
 				files.append(f)
 	files.sort()
 
+	# Disposição de controles: arquivo próprio dos testes e padrão de fábrica,
+	# pra nunca gravar por cima da disposição salva de quem joga no PC.
+	var layout = root.get_node("ControlLayout")
+	layout.save_path = "user://controles_teste.cfg"
+	layout.reset_defaults()
+
 	var total := 0
 	var failed := 0
 	var start := Time.get_ticks_msec()
@@ -32,6 +38,7 @@ func _main() -> void:
 		var t = load(DIR + f).new()
 		root.add_child(t)
 		root.get_node("GameState").reset()
+		layout.reset_defaults()
 		await t.run()
 		for r in t.results:
 			total += 1

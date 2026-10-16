@@ -16,6 +16,9 @@ extends Control
 @export var label_text: String = ""
 @export var idle_color: Color = Color(1, 1, 1, 0.25)
 @export var pressed_color: Color = Color(1, 0.6, 0.2, 0.55)
+## Lugar na disposição configurável (`ControlLayout`). Com lugar, posição e
+## tamanho vêm de lá e os offsets passados pela missão são ignorados.
+@export var layout_slot: String = ""
 
 @export var show_hold_progress: bool = false
 @export var hold_threshold: float = 0.5
@@ -28,6 +31,8 @@ var _pressed: bool = false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if layout_slot != "":
+		ControlLayout.apply(self, layout_slot)
 
 
 func _process(_delta: float) -> void:

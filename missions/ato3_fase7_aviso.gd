@@ -148,6 +148,7 @@ func _build_controls() -> void:
 	examine_btn.set_script(load("res://ui/contextual_button.gd"))
 	examine_btn.action_name = "examine"
 	examine_btn.label_text = tr("EXAMINAR")
+	examine_btn.layout_slot = "acao_principal"
 	examine_btn.anchor_left = 1.0
 	examine_btn.anchor_right = 1.0
 	examine_btn.anchor_top = 1.0

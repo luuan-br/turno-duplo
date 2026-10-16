@@ -254,13 +254,15 @@ func _build_controls() -> void:
 	pickup_btn.visible = false
 	layer.add_child(pickup_btn)
 
+	# ATIRAR e RECARGA seguem a disposição configurável (ControlLayout),
+	# como nas missões. ARROMBAR/ABRIR/PEGAR ficam fixos: aqui aparecem ao
+	# mesmo tempo que o ATIRAR, e nas missões dividem o lugar dele.
 	fire_btn = _corner_button("shoot", "ATIRAR", 30, 30, 100, 100)
+	fire_btn.layout_slot = "acao_principal"
 	layer.add_child(fire_btn)
 
-	# Menor e com vão de ~18px até o ATIRAR: a área de toque é o círculo
-	# inteiro, e encostado nele os dois disputariam o mesmo dedo.
 	reload_btn = _corner_button("reload", "RECARGA", 44, 148, 72, 72)
-	reload_btn.radius = 36.0
+	reload_btn.layout_slot = "acao_secundaria"
 	reload_btn.visible = false
 	layer.add_child(reload_btn)
 

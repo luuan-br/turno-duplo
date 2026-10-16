@@ -38,7 +38,9 @@ func _fase1_silencioso() -> void:
 	await skip_story()
 	check("Fase 1: devagar, ninguém ouve", _investigating(scene.combat) == 0)
 	check("Fase 1: combate começa depois do diálogo", scene._phase == "fight" and scene.combat.active)
+	expect_ammo("Fase 1", 10, 10)
 	await clear_guards(scene.player, scene.combat)
+	expect_drops("Fase 1")
 	check("Fase 1: derrubar os três fecha o combate", scene.combat.alive_count() == 0 and scene._phase == "outro", scene._phase)
 	await expect_done("Fase 1")
 
@@ -101,7 +103,9 @@ func _fase3() -> void:
 	await load_scene("res://missions/ato4_fase3_extracao.tscn")
 	await skip_story()
 	check("Fase 3: combate começa depois do diálogo", scene._phase == "fight" and scene.combat.active, scene._phase)
+	expect_ammo("Fase 3", 10, 10)
 	await clear_guards(scene.player, scene.combat)
+	expect_drops("Fase 3")
 	check("Fase 3: derrubar os sequestradores", scene._phase == "aftermath", scene._phase)
 	await skip_story()
 	await teleport(scene.player, scene.family_obj.position + Vector2(-35, 0))
@@ -126,7 +130,9 @@ func _fase4() -> void:
 func _fase5() -> void:
 	await load_scene("res://missions/ato4_fase5_cofre.tscn")
 	await skip_story()
+	expect_ammo("Fase 5", 10, 10)
 	await clear_guards(scene.player, scene.combat)
+	expect_drops("Fase 5")
 	check("Fase 5: derrubar os guardas do Cofre", scene._phase == "aftermath", scene._phase)
 	await skip_story()
 	await teleport(scene.player, scene.vault_obj.position + Vector2(-35, 0))
@@ -170,7 +176,9 @@ func _fase5_carro_destruido() -> void:
 func _fase6() -> void:
 	await load_scene("res://missions/ato4_fase6_arquiteto.tscn")
 	await skip_story()
+	expect_ammo("Fase 6", 10, 10)
 	await clear_guards(scene.player, scene.combat)
+	expect_drops("Fase 6")
 	check("Fase 6: derrubar a escolta do Kessler", scene._phase == "aftermath", scene._phase)
 	await skip_story()
 	var start: Vector2 = scene.kessler_marker.position
